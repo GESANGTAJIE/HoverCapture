@@ -1,0 +1,17 @@
+.DS_Store
+build/
+dist/
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.app/
+*.dmg
+*.zip
+*.dSYM/
+*.p12
+*.p8
+*.mobileprovision
+.env
+.env.*
+!.env.example

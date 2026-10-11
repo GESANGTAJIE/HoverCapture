@@ -1,0 +1,22 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Selection tests
+        run: bash scripts/test.sh
+      - name: Build universal application
+        run: bash scripts/build.sh
+      - name: Package application
+        run: bash scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HoverCapture-macOS
+          path: dist/
