@@ -1,6 +1,9 @@
 import AppKit
 
 let destination = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+guard let artwork = NSImage(contentsOfFile: CommandLine.arguments[3]) else {
+    fatalError("Could not load application icon artwork: \(CommandLine.arguments[3])")
+}
 try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
 func render(size: Int, name: String) throws {
     guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
@@ -12,32 +15,8 @@ func render(size: Int, name: String) throws {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = context
     context.cgContext.scaleBy(x: CGFloat(size) / 1024, y: CGFloat(size) / 1024)
-    let base = NSBezierPath(roundedRect: NSRect(x: 80, y: 80, width: 864, height: 864), xRadius: 194, yRadius: 194)
-    NSGradient(starting: NSColor(calibratedRed: 0.05, green: 0.25, blue: 0.33, alpha: 1),
-        ending: NSColor(calibratedRed: 0.03, green: 0.58, blue: 0.61, alpha: 1))?.draw(in: base, angle: 50)
-    NSColor.white.setStroke()
-    let corners = NSBezierPath()
-    corners.lineWidth = 38
-    corners.lineCapStyle = .round
-    corners.lineJoinStyle = .round
-    for (x, y, dx, dy) in [(260.0, 764.0, 135.0, -135.0), (764, 764, -135, -135),
-        (260, 260, 135, 135), (764, 260, -135, 135)] {
-        corners.move(to: NSPoint(x: x + dx, y: y))
-        corners.line(to: NSPoint(x: x, y: y))
-        corners.line(to: NSPoint(x: x, y: y + dy))
-    }
-    corners.stroke()
-    let pointer = NSBezierPath()
-    pointer.move(to: NSPoint(x: 427, y: 669))
-    pointer.line(to: NSPoint(x: 427, y: 361))
-    pointer.line(to: NSPoint(x: 507, y: 430))
-    pointer.line(to: NSPoint(x: 568, y: 312))
-    pointer.line(to: NSPoint(x: 627, y: 343))
-    pointer.line(to: NSPoint(x: 565, y: 461))
-    pointer.line(to: NSPoint(x: 671, y: 482))
-    pointer.close()
-    NSColor.white.setFill()
-    pointer.fill()
+    // Keep the existing macOS icon inset while preserving the supplied artwork.
+    artwork.draw(in: NSRect(x: 80, y: 80, width: 864, height: 864))
     NSGraphicsContext.restoreGraphicsState()
     guard let png = bitmap.representation(using: .png, properties: [:]) else {
         throw NSError(domain: "HoverCapture.Icon", code: 2)

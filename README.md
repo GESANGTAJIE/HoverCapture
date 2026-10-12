@@ -1,3 +1,5 @@
+![HoverCapture — hover, hotkey and paste](docs/assets/readme-banner.png)
+
 # HoverCapture
 
 [简体中文](README.zh-CN.md) · English
@@ -6,9 +8,15 @@ Point at a Mac window. Press one shortcut. Get a screenshot of that window, save
 
 HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon, a browser extension, or a background command-line service.
 
-## 0.1.0 preview status
+## 0.1.1 preview
 
-This is an early preview. Checks confirmed through **2026-10-12** on **macOS 15.7.2, Apple Silicon**:
+Version 0.1.1 updates the color app icon, the menu bar icon that follows the system's light and dark appearance, and the README banner. Screenshot behavior is unchanged.
+
+For this update, all 27 selection tests and both architecture builds passed. The new assets and desktop launch were checked. The rebuilt app needs Screen Recording permission again on the test Mac; capture and clipboard were not retested. See the [0.1.1 testing record](docs/TESTING.md).
+
+### Earlier functional baseline: 0.1.0
+
+The following checks were completed for **0.1.0** through **2026-10-12** on **macOS 15.7.2, Apple Silicon**. They are the earlier functional baseline, not a claim that every workflow has been retested for 0.1.1:
 
 - **27 selection-logic tests passed, 0 failed**, with successful `arm64` and `x86_64` compilation.
 - A physical press of the default shortcut captured an ordinary window, saved its PNG in the default folder, and copied the same image to the clipboard.
@@ -124,7 +132,7 @@ Settings are stored in macOS preferences under the application identifier `com.g
 
 ### System permission is on, but the app says “Permission needed”
 
-This mismatch was reproduced with an older ad-hoc signed permission entry on macOS 15.7.2. For the current build, the following app-specific recovery restored the **Allowed** status:
+This mismatch was reproduced with an older ad-hoc signed permission entry on macOS 15.7.2. During 0.1.0 testing, the following app-specific recovery restored the **Allowed** status:
 
 1. Open **System Settings → Privacy & Security → Screen Recording** or **Screen & System Audio Recording**.
 2. Select **HoverCapture** and use the minus/remove button to remove its old entry. Leave other apps' permissions unchanged.
@@ -157,8 +165,8 @@ From a checkout of this repository:
 The app is built at `build/HoverCapture.app`. The package script produces:
 
 ```text
-dist/HoverCapture-0.1.0-universal.dmg
-dist/HoverCapture-0.1.0-universal.zip
+dist/HoverCapture-0.1.1-universal.dmg
+dist/HoverCapture-0.1.1-universal.zip
 dist/SHA256SUMS.txt
 ```
 

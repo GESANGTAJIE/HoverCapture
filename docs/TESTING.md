@@ -4,7 +4,25 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
-## 0.1.0 preview: current record / 预览版当前记录
+## 0.1.1 branding update / 品牌更新
+
+Verified on 2026-10-12 on macOS 15.7.2, Apple Silicon:
+
+- Selection tests: **27 passed, 0 failed**. Universal compilation and build-time ad-hoc signature verification passed.
+- Both SVG originals and the README banner match the supplied files byte for byte. The generated ICNS and bundled vector menu icon decoded successfully in AppKit; light/dark asset previews and small icon sizes were visually inspected. A live system appearance switch was not tested.
+- The updated app launched through the desktop UI. The shortcut remained **⌃⌥⌘S** and the folder remained **`~/Downloads/WindowShots`**.
+- The rebuilt ad-hoc app reported **Permission needed**. Screen Recording was not re-granted and physical capture/clipboard tests were not repeated for this branding update. The 0.1.0 results below remain the earlier functional baseline.
+- Local ZIP packaging and ZIP integrity checks passed. The direct shell `--smoke-test` attempt aborted during AppKit application registration in the restricted session; the successful desktop launch is recorded separately, not as a passing CLI smoke test.
+
+2026-10-12 在 macOS 15.7.2、Apple Silicon 上验证：27 项选择逻辑测试通过、0 项失败；
+两种架构编译和构建时 ad-hoc 签名验证通过。原始 SVG 和横幅与用户提供文件逐字节一致，
+AppKit 可读取生成的 ICNS 和包内菜单栏矢量图，已检查深浅背景下的资源预览及小尺寸显示，
+未实际切换系统外观。新版通过桌面界面启动成功，快捷键和保存目录均保留。
+重建后的应用显示需要屏幕录制权限，本次未重新授权、未重测实体快捷键截图与剪贴板；
+下方 0.1.0 结果作为历史功能基线。新版本地 ZIP 打包及完整性检查通过。
+受限终端内的 `--smoke-test` 在 AppKit 注册应用阶段中止，不将桌面启动成功记作 CLI 检查通过。
+
+## 0.1.0 preview: earlier functional record / 此前的功能验证记录
 
 Test host / 测试设备：**macOS 15.7.2, Apple Silicon**。
 
@@ -69,9 +87,9 @@ Permission-recovery steps are in [the English README](../README.md#system-permis
 
 权限恢复步骤见上述 README 链接，不需要改动其他应用的权限或关闭系统保护。
 
-This is a **0.1.0 preview**, not a claim that all functions or all supported Macs have passed acceptance testing. The pending rows describe the current record and should be revised when new results are available. Other checklist items below have no passing result unless explicitly recorded.
+This is the **0.1.0 preview baseline**, not a claim that all functions or all supported Macs have passed acceptance testing. The pending rows should be revised when new results are available. Other checklist items below have no passing result unless explicitly recorded.
 
-当前定位为 **0.1.0 预览版**，不表示所有功能或所有支持机型已经完成验收。待验证项反映当前记录，得到新结果后应更新；下方其他清单项目，未明确记录通过的均不应视为已完成。
+以上是 **0.1.0 预览版功能基线**，不表示所有功能或所有支持机型已经完成验收。待验证项得到新结果后应更新；下方其他清单项目，未明确记录通过的均不应视为已完成。
 
 ## Automated checks / 自动检查
 
@@ -101,8 +119,8 @@ build/HoverCapture.app/Contents/MacOS/HoverCapture --smoke-test
 file build/HoverCapture.app/Contents/MacOS/HoverCapture
 lipo -archs build/HoverCapture.app/Contents/MacOS/HoverCapture
 codesign --verify --deep --strict --verbose=2 build/HoverCapture.app
-hdiutil verify dist/HoverCapture-0.1.0-universal.dmg
-unzip -t dist/HoverCapture-0.1.0-universal.zip
+hdiutil verify dist/HoverCapture-0.1.1-universal.dmg
+unzip -t dist/HoverCapture-0.1.1-universal.zip
 ```
 
 The smoke test checks application/menu/shortcut startup without taking a screenshot. Expect `arm64` and `x86_64` in a universal executable. A valid ad-hoc signature does **not** mean Gatekeeper will accept an internet-downloaded copy, and does **not** mean the app is notarized.

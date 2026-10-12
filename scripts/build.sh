@@ -14,9 +14,10 @@ done
 lipo -create "$BUILD/HoverCapture-arm64" "$BUILD/HoverCapture-x86_64" -output "$APP/Contents/MacOS/HoverCapture"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE"
+cp "$ROOT/Resources/StatusBarIconTemplate.pdf" "$APP/Contents/Resources/StatusBarIconTemplate.pdf"
 xcrun swiftc -sdk "$SDK" -module-cache-path "$BUILD/module-cache" \
     "$ROOT/scripts/make-icon.swift" -o "$BUILD/make-icon"
-"$BUILD/make-icon" "$BUILD/AppIcon.iconset" "$APP/Contents/Resources/AppIcon.icns"
+"$BUILD/make-icon" "$BUILD/AppIcon.iconset" "$APP/Contents/Resources/AppIcon.icns" "$ROOT/Resources/AppIcon.pdf"
 plutil -lint "$APP/Contents/Info.plist"
 # Clear metadata from this generated build artifact before signing.
 xattr -cr "$APP"

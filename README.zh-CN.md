@@ -1,3 +1,5 @@
+![HoverCapture：悬停窗口，按下快捷键，即可粘贴截图](docs/assets/readme-banner.png)
+
 # HoverCapture
 
 简体中文 · [English](README.md)
@@ -6,9 +8,15 @@
 
 HoverCapture 是原生 macOS 菜单栏应用，不需要 Hammerspoon、浏览器扩展或单独运行的命令行服务。
 
-## 0.1.0 预览版验证状态
+## 0.1.1 预览版
 
-这是早期预览版。截至 **2026-10-12**，已在 **macOS 15.7.2、Apple Silicon Mac** 上确认：
+0.1.1 更新了彩色应用图标、跟随系统深浅色外观的菜单栏图标，以及 README 横幅。截图行为没有改变。
+
+本次 27 项选择逻辑测试及两种架构构建均通过，已检查新图形资源和实际启动。测试机上的重建版本需要重新授予屏幕录制权限，本次未重测截图和剪贴板。详见 [0.1.1 测试记录](docs/TESTING.md)。
+
+### 此前的功能验证基线：0.1.0
+
+以下检查针对 **0.1.0**，截至 **2026-10-12** 已在 **macOS 15.7.2、Apple Silicon Mac** 上完成。这是此前的功能验证基线，不表示所有使用流程都已在 0.1.1 上重新测试：
 
 - **27 项窗口选择逻辑测试通过，0 项失败**，`arm64` 与 `x86_64` 两种架构编译通过。
 - 实体键盘按下默认快捷键后，普通窗口截图、默认目录 PNG 保存、同图复制到剪贴板均通过。
@@ -136,7 +144,7 @@ HoverCapture 使用 Apple ScreenCaptureKit 获取静态图片，在本机编码�
 
 **快捷键没有反应？** 先确认菜单栏图标存在，再检查设置里的组合键。检查 Hammerspoon、其他截图软件或系统快捷键是否占用了同一组合。
 
-**系统授权开关已开启，应用仍显示“需要授权”？** macOS 15.7.2 上已复现旧 ad-hoc 签名版本留下的授权条目与当前构建状态不一致。以下步骤已实测能恢复当前构建的“已允许”状态：
+**系统授权开关已开启，应用仍显示“需要授权”？** macOS 15.7.2 上已复现旧 ad-hoc 签名版本留下的授权条目与实际运行的构建状态不一致。以下步骤曾在 0.1.0 测试中恢复“已允许”状态：
 
 1. 打开 **系统设置 → 隐私与安全性 → 屏幕录制**，部分版本称为“屏幕与系统音频录制”。
 2. 选中 **HoverCapture**，用减号或移除按钮删除它的旧条目。保留其他应用的权限不变。
@@ -181,8 +189,8 @@ HoverCapture 使用 Apple ScreenCaptureKit 获取静态图片，在本机编码�
 应用输出到 `build/HoverCapture.app`，安装包输出为：
 
 ```text
-dist/HoverCapture-0.1.0-universal.dmg
-dist/HoverCapture-0.1.0-universal.zip
+dist/HoverCapture-0.1.1-universal.dmg
+dist/HoverCapture-0.1.1-universal.zip
 dist/SHA256SUMS.txt
 ```
 

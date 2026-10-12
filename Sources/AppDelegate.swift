@@ -130,8 +130,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func restoreStatusIcon() {
-        statusItem.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "HoverCapture")
+        if let image = NSImage(named: "StatusBarIconTemplate") {
+            image.size = NSSize(width: 18 * image.size.width / image.size.height, height: 18)
+            statusItem.button?.image = image
+        } else {
+            NSLog("HoverCapture: bundled StatusBarIconTemplate image is missing")
+            statusItem.button?.image = NSImage(systemSymbolName: "viewfinder", accessibilityDescription: "HoverCapture")
+        }
         statusItem.button?.image?.isTemplate = true
+        statusItem.button?.setAccessibilityLabel("HoverCapture")
         statusItem.button?.toolTip = "HoverCapture — " + savedShortcut.label
     }
 
@@ -295,7 +302,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "HoverCapture", .applicationVersion: "0.1.0",
+            .applicationName: "HoverCapture",
             .credits: NSAttributedString(string: AppText.pick("开源窗口截图工具 · MIT 许可证\n原生 macOS 应用，无需 Hammerspoon。", "Open-source window screenshots · MIT License\nA native macOS app. No Hammerspoon required."))
         ])
     }
