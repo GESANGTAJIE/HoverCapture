@@ -4,6 +4,32 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
+## 0.2.0 batch, language, and interface / 连续截图、语言与界面
+
+Verified on 2026-10-12 on macOS 15.7.2, Apple Silicon:
+
+- **70 model checks passed, 0 failed:** 27 selection, 18 language, and 25 batch checks. Batch checks include order, capacity limits and shrinking, retries after copy failure, latest-only mode, and preserving content copied by other apps.
+- Both architectures built successfully. The English and Chinese settings windows were inspected, including the logo and Lucide vector icons. Language changes applied immediately. Capacity input and the stepper worked; entering 21 showed a localized error and retained the previous valid value.
+- After quitting and relaunching, the selected Chinese language and capacity of 4 remained. The existing screenshot folder and global shortcut also remained unchanged. Test settings were restored to capacity 1 and Follow System afterward.
+- A separate local GUI harness compiled the production `CaptureBatch.swift` and generated harmless numbered PNGs 01, 02, and 03. Both private and general native pasteboards contained three separate items in that order; `NSImage` and `NSURL` readers each returned three objects. Copy Latest returned only 03 and left the internal batch intact. Clearing emptied the batch without deleting the sample PNGs.
+- **User-confirmed receiver checks:** the user pressed Command–V once into an empty draft in ChatGPT and, separately, WeChat. In both cases, all three images appeared in the correct order. No message was sent for these checks. Exact receiver versions were not recorded; this is a result for the tested setup, not all versions.
+- The restricted shell could not reach the pasteboard service, even for a basic text write. Its native integration check was explicitly skipped; the GUI harness covered actual pasteboard access separately. CI runs `scripts/test.sh --require-pasteboard` to make native integration mandatory there.
+- The rebuilt app reported that Screen Recording permission was needed. The complete physical-shortcut-to-capture workflow was not rerun on 0.2.0. The tests above validate batching and paste delivery using generated PNGs, not new screen-capture acceptance. The earlier capture baseline is recorded below.
+
+2026-10-12 在 macOS 15.7.2、Apple Silicon 上完成：**70 项逻辑检查通过，0 失败**
+（窗口选择 27、语言 18、批次 25），两种架构均编译成功。中英文界面、Logo 与 Lucide 图标已检查；
+手动语言立即生效，数量输入及加减按钮可用，输入 21 会显示中文错误并保留原值。
+重启后中文选择与数量 4 均保留，原目录和快捷键不变；测试后恢复数量 1 和跟随系统。
+
+单独的本机 GUI 测试工具直接复用生产版 `CaptureBatch.swift`，生成无隐私编号图 01、02、03。
+私有及系统剪贴板均读回三项，PNG、文件与图片读取顺序一致；仅复制最新一张时得到 03；清空不删除 PNG。
+用户分别在 ChatGPT 和微信空白草稿中按一次 ⌘V，均确认三张图全部出现、顺序正确，测试未发送消息。
+未记录接收应用的具体版本，因此不将结果推广至所有版本。
+
+受限终端连基础文本剪贴板写入也不可用，已明确跳过该环境的原生集成检查，并以上述 GUI 实测补充；
+云端测试要求原生剪贴板检查必须通过。重建版本仍需屏幕录制授权，本次没有重跑实体快捷键到截图的完整链路，
+批次和粘贴验收使用的是生成的 PNG。此前真实截图的验收基线保留如下。
+
 ## 0.1.1 branding update / 品牌更新
 
 Verified on 2026-10-12 on macOS 15.7.2, Apple Silicon:
@@ -119,8 +145,8 @@ build/HoverCapture.app/Contents/MacOS/HoverCapture --smoke-test
 file build/HoverCapture.app/Contents/MacOS/HoverCapture
 lipo -archs build/HoverCapture.app/Contents/MacOS/HoverCapture
 codesign --verify --deep --strict --verbose=2 build/HoverCapture.app
-hdiutil verify dist/HoverCapture-0.1.1-universal.dmg
-unzip -t dist/HoverCapture-0.1.1-universal.zip
+hdiutil verify dist/HoverCapture-0.2.0-universal.dmg
+unzip -t dist/HoverCapture-0.2.0-universal.zip
 ```
 
 The smoke test checks application/menu/shortcut startup without taking a screenshot. Expect `arm64` and `x86_64` in a universal executable. A valid ad-hoc signature does **not** mean Gatekeeper will accept an internet-downloaded copy, and does **not** mean the app is notarized.

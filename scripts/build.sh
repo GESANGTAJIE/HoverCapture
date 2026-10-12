@@ -15,6 +15,8 @@ lipo -create "$BUILD/HoverCapture-arm64" "$BUILD/HoverCapture-x86_64" -output "$
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE"
 cp "$ROOT/Resources/StatusBarIconTemplate.pdf" "$APP/Contents/Resources/StatusBarIconTemplate.pdf"
+mkdir -p "$APP/Contents/Resources/Icons"
+cp "$ROOT"/Resources/Icons/*.pdf "$ROOT/Resources/Icons/LICENSE" "$APP/Contents/Resources/Icons/"
 xcrun swiftc -sdk "$SDK" -module-cache-path "$BUILD/module-cache" \
     "$ROOT/scripts/make-icon.swift" -o "$BUILD/make-icon"
 "$BUILD/make-icon" "$BUILD/AppIcon.iconset" "$APP/Contents/Resources/AppIcon.icns" "$ROOT/Resources/AppIcon.pdf"

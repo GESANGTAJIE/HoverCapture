@@ -8,15 +8,21 @@ Point at a Mac window. Press one shortcut. Get a screenshot of that window, save
 
 HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon, a browser extension, or a background command-line service.
 
-## 0.1.1 preview
+## 0.2.0 preview
+
+Version 0.2.0 adds a configurable screenshot batch for pasting several captures together, a manual Chinese/English language selector, and a refreshed settings window with the HoverCapture logo, brand colors, and Lucide icons. The default batch capacity is **1**, preserving the single-image workflow.
+
+See [the testing record](docs/TESTING.md) for the checks actually completed. The user confirmed that one paste inserted all three numbered sample images, in order, in both ChatGPT and WeChat. Other apps and versions may accept fewer clipboard items.
+
+### Earlier visual update: 0.1.1
 
 Version 0.1.1 updates the color app icon, the menu bar icon that follows the system's light and dark appearance, and the README banner. Screenshot behavior is unchanged.
 
-For this update, all 27 selection tests and both architecture builds passed. The new assets and desktop launch were checked. The rebuilt app needs Screen Recording permission again on the test Mac; capture and clipboard were not retested. See the [0.1.1 testing record](docs/TESTING.md).
+For 0.1.1, all 27 selection tests and both architecture builds passed. The new assets and desktop launch were checked. That rebuilt app needed Screen Recording permission again on the test Mac; capture and clipboard were not retested.
 
 ### Earlier functional baseline: 0.1.0
 
-The following checks were completed for **0.1.0** through **2026-10-12** on **macOS 15.7.2, Apple Silicon**. They are the earlier functional baseline, not a claim that every workflow has been retested for 0.1.1:
+The following checks were completed for **0.1.0** through **2026-10-12** on **macOS 15.7.2, Apple Silicon**. They remain an earlier functional baseline; current-version results are recorded separately in [docs/TESTING.md](docs/TESTING.md):
 
 - **27 selection-logic tests passed, 0 failed**, with successful `arm64` and `x86_64` compilation.
 - A physical press of the default shortcut captured an ordinary window, saved its PNG in the default folder, and copied the same image to the clipboard.
@@ -32,9 +38,11 @@ Overlapping windows, dialogs and popups, Dock/menu fallback, first-install autho
 - Captures the **display containing the pointer** when the pointer is over the desktop, Dock, or menu area.
 - Saves to a folder you choose; the default is `~/Downloads/WindowShots`.
 - Copies the same image to the clipboard, ready for **Command–V** in an app that accepts images.
+- Optionally keeps the latest **1–20 screenshots** in a batch, ordered by capture time, for one paste in apps that accept multiple images or files.
 - Uses **Control–Option–Command–S** (`⌃⌥⌘S`) by default, with a customizable global shortcut.
 - Excludes window shadows, the pointer, and separately attached child windows from a window capture.
-- Offers optional launch at login and an interface that follows the system language: Chinese or English.
+- Offers optional launch at login and a persistent language choice: **Follow System**, **简体中文**, or **English**.
+- Uses the HoverCapture logo and brand palette: black `#0E0D0C`, orange `#FF6B2C`, and warm white `#F7F7F5`.
 - Processes screenshots locally, with no accounts, analytics, or image uploads.
 
 ## Requirements
@@ -80,13 +88,27 @@ A successful capture briefly changes the menu bar icon to a checkmark. Files are
 
 The pointer's position matters; the keyboard-focused window does not have to be the target. Leave the pointer on empty desktop to capture that entire display instead. A display capture includes the other visible windows, desktop, Dock, and menu bar on that display.
 
-Open **Settings** from the menu bar icon. Under **Save location**, use **Choose…** to select a destination such as `Documents/WindowShots`; **Open Folder** opens the current destination in Finder. Use the **Keyboard shortcut** control to change the shortcut. You do not need to edit code. Enable **Launch at login** if you want HoverCapture to be available after signing in.
+Open **Settings** from the menu bar icon. Under **Save location**, use **Choose Folder…** to select a destination such as `Documents/WindowShots`; **Open Screenshots** opens the current destination in Finder. Use the **Capture shortcut** control to change the shortcut. You do not need to edit code. Enable **Launch HoverCapture at login** if you want it to be available after signing in.
 
 Choose a shortcut that does not conflict with another app or a macOS shortcut. If a shortcut cannot be registered, HoverCapture reports the problem; choose another combination.
 
 To change it, click the current shortcut and press a new key combination containing Control, Option, or Command. Press Escape to cancel.
 
 If you previously installed the Hammerspoon configuration, disable its old binding or choose a different shortcut before running both tools.
+
+### Capture several images for one paste
+
+Set **Capture batch** to a number from **1 to 20**. Each new screenshot is saved as a PNG and added to the group; the oldest is removed from the group when it exceeds the limit. For example, with a capacity of 3, capturing A, B, C, then D leaves B, C, D ready to paste, in that order. The saved A file remains on disk.
+
+The current group is copied automatically after each capture. **Copy Batch** copies it again, **Copy Latest Only** copies just the newest image, and **Clear** starts an empty group. Pasting does not consume the group. Lowering the capacity drops its oldest entries. A settings change or Clear will not overwrite new clipboard content copied in another app.
+
+HoverCapture supplies each item as PNG data and, when saving succeeded, a file reference. An app that supports multi-image or multi-file paste can accept the group with **⌘V**; another app may accept only its first image or treat the group as file attachments. On the test Mac, the user confirmed all three numbered sample images appeared in order after one paste in ChatGPT and WeChat. This does not establish compatibility with every version. If needed, use **Copy Latest Only**, or select the saved PNGs in the destination app's attachment picker.
+
+The capacity is remembered after restart. The group itself stays in memory and resets when HoverCapture quits; saved PNGs are never deleted by clearing or resizing it. The system clipboard may retain the last copied images after the app exits.
+
+### Choose the interface language
+
+In **Interface language**, choose **Follow System**, **简体中文**, or **English**. Changes apply immediately to HoverCapture without restarting and are remembered for the next launch. Follow System uses Chinese when the primary system language is Chinese, otherwise English; macOS-owned dialogs follow macOS language settings.
 
 ## Exactly what gets captured
 
@@ -110,9 +132,9 @@ Window identities, geometry, and pixels are supplied by macOS. Unusual apps and 
 
 ## Privacy and files
 
-HoverCapture does not upload screenshots, contact a server, collect analytics, or require an account. It uses Apple's ScreenCaptureKit to obtain a still image, writes PNG data to the chosen folder, and writes the image to the system clipboard.
+HoverCapture does not upload screenshots, contact a server, collect analytics, or require an account. It uses Apple's ScreenCaptureKit to obtain a still image, writes PNG data to the chosen folder, and keeps up to the configured number of captures in memory for copying to the system clipboard.
 
-Clipboard content replaces the previous clipboard item. Other software that reads the clipboard can access it, and system features such as Universal Clipboard may share it according to your macOS settings. A cloud-synced destination folder can also sync screenshots through its own service; HoverCapture does not control that service.
+Capturing or using a Copy control replaces the previous clipboard content with an image or group. Clipboard items include PNG data and, for saved captures, references to their local files. Other software that reads the clipboard can access this content, and system features such as Universal Clipboard may share it according to your macOS settings. A cloud-synced destination folder can also sync screenshots through its own service; HoverCapture does not control that service.
 
 Settings are stored in macOS preferences under the application identifier `com.gesangtajie.HoverCapture`. Screenshot files remain in the folder you select. Uninstalling the app does not delete them.
 
@@ -127,6 +149,7 @@ Settings are stored in macOS preferences under the application identifier `com.g
 | File saved, clipboard failed | Open the saved PNG. The app reports partial failure instead of treating the whole operation as successful. |
 | Wrong capture area | Check the pointer position and the table above. Dock, menu, or unsupported overlay fallback deliberately captures the whole pointer display. |
 | Pasting produces nothing | Paste into an app that accepts images; plain-text fields do not. Check whether another app replaced the clipboard. |
+| Only one image pastes from a batch | The receiving app may only read the first clipboard item. Use **Copy Latest Only** for a single image, or attach the saved PNGs through that app's file picker. |
 | Black or incomplete content | Check permission, try an ordinary window, and consider protected-content restrictions. |
 | Launch at login needs approval | Check the login items controls in System Settings. Install in Applications before enabling it. |
 
@@ -165,8 +188,8 @@ From a checkout of this repository:
 The app is built at `build/HoverCapture.app`. The package script produces:
 
 ```text
-dist/HoverCapture-0.1.1-universal.dmg
-dist/HoverCapture-0.1.1-universal.zip
+dist/HoverCapture-0.2.0-universal.dmg
+dist/HoverCapture-0.2.0-universal.zip
 dist/SHA256SUMS.txt
 ```
 
@@ -188,21 +211,32 @@ The app uses native AppKit for its menu and settings, ScreenCaptureKit for scree
 | --- | --- |
 | `Sources/main.swift` | Native application entry point. |
 | `Sources/AppDelegate.swift` | Menu bar, settings, permissions, and app lifecycle. |
+| `Sources/AppTheme.swift` | Brand colors, typography, and bundled interface icons. |
+| `Sources/AppLanguage.swift` | Persisted interface-language choice. |
 | `Sources/HotKeyController.swift` | Global shortcut registration and cleanup. |
 | `Sources/CaptureSelection.swift` | Window hit testing and display fallback. |
-| `Sources/CaptureEngine.swift` | ScreenCaptureKit capture, PNG saving, and clipboard output. |
+| `Sources/CaptureEngine.swift` | ScreenCaptureKit capture and PNG saving. |
+| `Sources/CaptureBatch.swift` | Bounded capture group and ordered clipboard output. |
 | `Tests/SelectionTests.swift` | Selection tests that do not capture the screen. |
+| `Tests/BatchTests.swift`, `Tests/LanguageTests.swift` | Batch behavior, clipboard output, and language preferences. |
 | `scripts/` | Local test, build, and packaging commands. |
 
 For an additional startup check, run `build/HoverCapture.app/Contents/MacOS/HoverCapture --smoke-test`. This checks application/menu/shortcut startup; it does not take a screenshot or verify capture permission.
 
 See [the testing guide](docs/TESTING.md) for automated checks and the manual release checklist. Passing selection tests or compiling successfully does not prove that real screen capture, permissions, or every display layout work on a given Mac.
 
+## Co-authors
+
+- **ChesterGe** — product direction, visual design, and project maintenance. GitHub: [GESANGTAJIE](https://github.com/GESANGTAJIE).
+- **GPT (OpenAI)** — AI co-author, contributing to implementation and documentation.
+
 ## Contributing and license
 
 Bug reports and focused pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 HoverCapture is released under the [MIT License](LICENSE).
+
+Interface icons come from [Lucide](https://lucide.dev/icons/), with its ISC and inherited Feather MIT notices preserved in the [icon license](https://github.com/GESANGTAJIE/HoverCapture/blob/main/Resources/Icons/LICENSE) and distributed app resources.
 
 ## Apple API references
 

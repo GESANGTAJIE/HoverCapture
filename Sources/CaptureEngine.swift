@@ -10,6 +10,8 @@ struct CaptureResult {
 
 @MainActor
 final class CaptureEngine {
+    let batch = CaptureBatch()
+
     func capture(directory: URL) async throws -> CaptureResult {
         guard CGPreflightScreenCaptureAccess() else {
             throw failure("请在系统设置中允许 HoverCapture 录制屏幕，然后完全退出并重新打开软件。",
@@ -128,23 +130,23 @@ final class CaptureEngine {
     }
 
     private func deliver(_ image: CGImage, directory: URL, kind: String) throws -> CaptureResult {
-        // Publish an actual image, so Paste works in image editors and chat apps.
-        // Saving and copying are independent: keep whichever output succeeds.
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        let copied = pasteboard.writeObjects([NSImage(cgImage: image, size: .zero)])
-        var warnings: [String] = []
-        if !copied {
-            warnings.append(captureText("复制到剪贴板失败。", "Could not copy the image to the clipboard."))
+        guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
+            // Keep direct image copying available even if PNG encoding fails.
+            // The unencoded image is never retained in the batch.
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            let copied = pasteboard.writeObjects([NSImage(cgImage: image, size: .zero)])
+            let warning = captureText("无法编码 PNG，截图未保存或加入批次。", "Could not encode PNG. The screenshot was not saved or added to the batch.")
+            guard copied else {
+                throw failure("无法编码 PNG，且复制到剪贴板失败。", "Could not encode PNG or copy the image to the clipboard.")
+            }
+            return CaptureResult(fileURL: nil, clipboardCopied: true, warning: warning, kind: kind)
         }
-
+        var warnings: [String] = []
         var fileURL: URL?
         do {
             guard directory.isFileURL else {
                 throw failure("保存位置必须是本地文件夹。", "The save location must be a local folder.")
-            }
-            guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
-                throw failure("无法编码 PNG 图片。", "Could not encode the PNG image.")
             }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let formatter = DateFormatter()
@@ -157,6 +159,11 @@ final class CaptureEngine {
         } catch {
             warnings.append(captureText("保存失败（\(directory.path)）：\(error.localizedDescription)",
                                         "Could not save to \(directory.path): \(error.localizedDescription)"))
+        }
+        // PNG bytes stay available for copying even if the destination is unwritable.
+        let copied = batch.append(pngData: png, fileURL: fileURL)
+        if !copied {
+            warnings.append(captureText("复制批次到剪贴板失败，可在设置中重试。", "Could not copy the batch to the clipboard. Retry from Settings."))
         }
         guard copied || fileURL != nil else {
             throw CaptureEngineError(message: warnings.joined(separator: "\n"))
@@ -171,7 +178,7 @@ final class CaptureEngine {
 }
 
 private func captureText(_ chinese: String, _ english: String) -> String {
-    Locale.preferredLanguages.first?.hasPrefix("zh") == true ? chinese : english
+    AppText.pick(chinese, english)
 }
 
 private struct CaptureEngineError: LocalizedError {

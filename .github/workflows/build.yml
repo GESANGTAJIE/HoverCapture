@@ -10,8 +10,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Selection tests
-        run: bash scripts/test.sh
+      - name: Logic and native clipboard tests
+        run: bash scripts/test.sh --require-pasteboard
       - name: Build universal application
         run: bash scripts/build.sh
       - name: Package application
