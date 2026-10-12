@@ -8,13 +8,15 @@ HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon,
 
 ## 0.1.0 preview status
 
-This is an early preview. Checks confirmed so far on **macOS 15.7.2, Apple Silicon**:
+This is an early preview. Checks confirmed through **2026-10-12** on **macOS 15.7.2, Apple Silicon**:
 
-- **27 selection-logic tests passed, 0 failed.**
-- The application compiled for both `arm64` and `x86_64`.
-- The application launched on the test Mac, and its settings layout was visually inspected.
+- **27 selection-logic tests passed, 0 failed**, with successful `arm64` and `x86_64` compilation.
+- A physical press of the default shortcut captured an ordinary window, saved its PNG in the default folder, and copied the same image to the clipboard.
+- A customized shortcut captured the single display from empty desktop and saved into a chosen folder containing Chinese characters and spaces.
+- App startup, settings layout, permission recovery, and persistence of a changed shortcut and folder across a restart were checked.
+- GitHub CI generated both **DMG and ZIP** packages on 2026-10-11; local checksum and archive-integrity checks passed.
 
-Real screenshot output, clipboard pasting, the Screen Recording authorization flow, multiple displays, and execution on an Intel Mac are **still awaiting acceptance testing in the current record**. These are separate from successful compilation and startup. See [the testing record and checklist](docs/TESTING.md) for the current scope; update that record as further checks are completed.
+Overlapping windows, dialogs and popups, Dock/menu fallback, first-install authorization, multiple displays, Intel execution, and launch at login are **still awaiting acceptance testing**. See [the testing record and checklist](docs/TESTING.md) for evidence and remaining scope.
 
 ## What it does
 
@@ -112,13 +114,25 @@ Settings are stored in macOS preferences under the application identifier `com.g
 | --- | --- |
 | No Dock icon | Expected: use the menu bar icon. |
 | Shortcut does nothing | Confirm HoverCapture is running, check its configured shortcut, and remove conflicting bindings in other apps. |
-| Permission error or missing windows | Enable Screen Recording for the installed copy, then quit and reopen it. Updates to an ad-hoc signed app can require renewed permission. |
+| Permission error or missing windows | Enable Screen Recording for the installed copy, then quit and reopen it. If the system toggle is already on but the app says **Permission needed**, follow the recovery steps below. |
 | Capture works, saving fails | Choose a writable folder and check disk space and folder permission. A copied image can still be pasted when the app reports that only saving failed. |
 | File saved, clipboard failed | Open the saved PNG. The app reports partial failure instead of treating the whole operation as successful. |
 | Wrong capture area | Check the pointer position and the table above. Dock, menu, or unsupported overlay fallback deliberately captures the whole pointer display. |
 | Pasting produces nothing | Paste into an app that accepts images; plain-text fields do not. Check whether another app replaced the clipboard. |
 | Black or incomplete content | Check permission, try an ordinary window, and consider protected-content restrictions. |
 | Launch at login needs approval | Check the login items controls in System Settings. Install in Applications before enabling it. |
+
+### System permission is on, but the app says “Permission needed”
+
+This mismatch was reproduced with an older ad-hoc signed permission entry on macOS 15.7.2. For the current build, the following app-specific recovery restored the **Allowed** status:
+
+1. Open **System Settings → Privacy & Security → Screen Recording** or **Screen & System Audio Recording**.
+2. Select **HoverCapture** and use the minus/remove button to remove its old entry. Leave other apps' permissions unchanged.
+3. Use the plus/add button and select the **exact HoverCapture.app you intend to run**—normally the copy in Applications. If testing a local build, select that build instead of an older installed or downloaded copy.
+4. Enable HoverCapture's screen access, then choose **Quit & Reopen** when prompted. Otherwise, quit that app completely and reopen the same copy.
+5. Open HoverCapture settings and confirm that Screen Recording now says **Allowed**.
+
+This only refreshes HoverCapture's own permission entry. It does not require disabling system protections or resetting other apps' permissions. A status of **Allowed** confirms this recovery step; verify actual capture separately with the physical shortcut and an image paste.
 
 Report reproducible problems through [GitHub Issues](https://github.com/GESANGTAJIE/HoverCapture/issues). Include your macOS version, Mac architecture, app version, display arrangement, target app, and the exact error. Remove private content from any screenshot before sharing it.
 
