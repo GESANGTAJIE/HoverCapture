@@ -33,17 +33,18 @@ struct CaptureShortcut: Codable, Equatable {
 }
 
 final class HotKeyController {
-    var onPress: (() -> Void)?
+    let onPress: () -> Void
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private(set) var shortcut: CaptureShortcut?
 
-    init() throws {
+    init(onPress: @escaping () -> Void) throws {
+        self.onPress = onPress
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let callback: EventHandlerUPP = { _, _, context in
             guard let context else { return OSStatus(eventNotHandledErr) }
             let controller = Unmanaged<HotKeyController>.fromOpaque(context).takeUnretainedValue()
-            DispatchQueue.main.async { controller.onPress?() }
+            DispatchQueue.main.async { controller.onPress() }
             return noErr
         }
         let result = InstallEventHandler(GetApplicationEventTarget(), callback, 1, &eventType,

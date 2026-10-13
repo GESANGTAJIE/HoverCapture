@@ -14,3 +14,8 @@ xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" -fra
     "$ROOT/Sources/CaptureBatch.swift" "$ROOT/Tests/BatchTests.swift" \
     -o "$ROOT/build/batch-tests"
 "$ROOT/build/batch-tests" "$@"
+xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" -framework ServiceManagement \
+    "$ROOT/Sources/LoginItemSettings.swift" "$ROOT/Tests/LoginItemTests.swift" \
+    -o "$ROOT/build/login-item-tests"
+"$ROOT/build/login-item-tests"
+bash "$ROOT/Tests/PackagingTests.sh"

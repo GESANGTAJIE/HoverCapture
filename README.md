@@ -8,7 +8,11 @@ Point at a Mac window. Press one shortcut. Get a screenshot of that window, save
 
 HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon, a browser extension, or a background command-line service.
 
-## 0.2.0 preview
+## 0.2.1 preview
+
+Fixes shortcut recovery after a startup conflict and cancellation of login items awaiting approval. Packaging now always rebuilds the current source, preventing stale apps from being shipped under a new version label. Homebrew installation is available through our own tap (see below).
+
+### Batch and interface update: 0.2.0
 
 Version 0.2.0 adds a configurable screenshot batch for pasting several captures together, a manual Chinese/English language selector, and a refreshed settings window with the HoverCapture logo, brand colors, and Lucide icons. The default batch capacity is **1**, preserving the single-image workflow.
 
@@ -55,6 +59,18 @@ No additional runtime dependencies are required. Accessibility, Input Monitoring
 
 ## Install
 
+### Homebrew
+
+With [Homebrew](https://brew.sh/) already installed:
+
+```sh
+brew install --cask gesangtajie/tap/hovercapture
+```
+
+This uses our [own tap](https://github.com/GESANGTAJIE/homebrew-tap), not the official Homebrew Cask repository. It downloads the versioned universal release and verifies its SHA-256. It does not bypass Gatekeeper or grant Screen Recording. If you already installed the app manually, quit it and move the old app out of Applications before installing with Homebrew; do not delete your screenshots or preferences.
+
+### DMG or ZIP
+
 Release packages are distributed through the repository's [Releases page](https://github.com/GESANGTAJIE/HoverCapture/releases). If a packaged release is not available, see [Build from source](#build-from-source).
 
 1. Download the universal `.dmg` file and open it.
@@ -66,7 +82,7 @@ The `.zip` package is an alternative: unzip it and move the app into Application
 
 ### Current signing status
 
-The initial build is **ad-hoc signed, without a Developer ID certificate or Apple notarization**. A downloaded copy may be blocked by Gatekeeper.
+This preview is **ad-hoc signed, without a Developer ID certificate or Apple notarization**, including the Homebrew download. A downloaded copy may be blocked by Gatekeeper.
 
 After checking that your download comes from this repository and deciding to trust it, try opening the app once, then use **System Settings → Privacy & Security → Open Anyway** for HoverCapture. Managed Macs may restrict this option. Do not disable Gatekeeper or remove quarantine from unrelated files. [Apple's explanation](https://support.apple.com/en-us/102445)
 
@@ -169,9 +185,18 @@ Report reproducible problems through [GitHub Issues](https://github.com/GESANGTA
 
 ## Update and uninstall
 
-**Update:** quit HoverCapture from its menu, replace the app in Applications, and reopen it. Existing preferences and screenshots remain. Recheck Screen Recording and Launch at login after replacing an ad-hoc signed build.
+**Update:** quit HoverCapture from its menu (closing Settings is not quitting). For a manual installation, replace the app in Applications and reopen that same copy. For Homebrew:
+
+```sh
+brew update
+brew upgrade --cask gesangtajie/tap/hovercapture
+```
+
+Existing preferences and saved screenshots remain. Test one capture after updating. If Screen Recording still works, do not remove its grant. If the system switch is enabled but the app says Permission needed, remove only HoverCapture's old entry in Privacy & Security, add the exact newly installed app, and choose Quit & Reopen. A complete uninstall or deletion of settings/screenshots is unnecessary. Ad-hoc builds may need this after updates; Homebrew does not change that limitation. Recheck Launch at login as well.
 
 **Uninstall:** turn off Launch at login, quit HoverCapture, and move the app from Applications to the Trash. Remove its Screen Recording entry in System Settings if desired. Saved screenshots and preferences are retained unless you remove them separately.
+
+For a Homebrew installation, quit the app and use `brew uninstall --cask hovercapture` instead of moving it manually. This tap deliberately provides no destructive cleanup of screenshots/preferences or automatic permission resets.
 
 ## Build from source
 
@@ -181,15 +206,14 @@ From a checkout of this repository:
 
 ```sh
 ./scripts/test.sh
-./scripts/build.sh
 ./scripts/package.sh
 ```
 
-The app is built at `build/HoverCapture.app`. The package script produces:
+The package script always builds the current source first. The app is built at `build/HoverCapture.app`; for a build without packaging, use `./scripts/build.sh`. The package script produces:
 
 ```text
-dist/HoverCapture-0.2.0-universal.dmg
-dist/HoverCapture-0.2.0-universal.zip
+dist/HoverCapture-0.2.1-universal.dmg
+dist/HoverCapture-0.2.1-universal.zip
 dist/SHA256SUMS.txt
 ```
 

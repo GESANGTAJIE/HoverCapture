@@ -8,7 +8,11 @@
 
 HoverCapture 是原生 macOS 菜单栏应用，不需要 Hammerspoon、浏览器扩展或单独运行的命令行服务。
 
-## 0.2.0 预览版
+## 0.2.1 预览版
+
+修复启动时快捷键冲突后的恢复，以及待系统批准的登录启动项无法取消的问题。打包前始终重新构建当前源码，防止新版本名称对应旧程序。新增自有 Homebrew tap 安装方式，见下文。
+
+### 连续截图与界面更新：0.2.0
 
 0.2.0 新增可自定义数量的连续截图组、手动中英文切换，并更新设置界面：加入 HoverCapture Logo、品牌配色和 Lucide 图标。连续截图数量默认 **1 张**，保持原有单图操作习惯。
 
@@ -56,6 +60,18 @@ HoverCapture 是原生 macOS 菜单栏应用，不需要 Hammerspoon、浏览器
 
 ## 安装
 
+### Homebrew
+
+已安装 [Homebrew](https://brew.sh/) 的用户可以运行：
+
+```sh
+brew install --cask gesangtajie/tap/hovercapture
+```
+
+使用的是我们的[自有 tap](https://github.com/GESANGTAJIE/homebrew-tap)，不是 Homebrew 官方 Cask 仓库。它下载指定版本的通用安装包并验证 SHA-256，不绕过系统安全检查，也不会自动授予屏幕录制权限。如果此前手动安装过，请先退出应用，将旧应用移出“应用程序”再用 Homebrew 安装，不必删除截图和偏好设置。
+
+### DMG 或 ZIP
+
 安装包通过本仓库的 [Releases 页面](https://github.com/GESANGTAJIE/HoverCapture/releases)提供。如果页面还没有安装包，可以按下文的“从源码构建”操作。
 
 1. 下载名称以 `universal.dmg` 结尾的文件。
@@ -67,7 +83,7 @@ HoverCapture 是原生 macOS 菜单栏应用，不需要 Hammerspoon、浏览器
 
 ### 关于首次打开的安全提示
 
-初始版本采用**本地 ad-hoc 签名，没有 Developer ID 开发者证书，也没有完成 Apple 公证**。从网络下载后，macOS 可能阻止它直接打开。
+当前预览版采用**本地 ad-hoc 签名，没有 Developer ID 开发者证书，也没有完成 Apple 公证**，Homebrew 下载的版本同样如此。从网络下载后，macOS 可能阻止它直接打开。
 
 确认下载来自本仓库且你愿意信任该版本后，先尝试打开一次，再进入 **系统设置 → 隐私与安全性 → 仍要打开**，对 HoverCapture 单独确认。受管理的 Mac 可能无法使用这个选项。不要为了安装它关闭整个系统的 Gatekeeper，也不要批量清除其他文件的隔离属性。[Apple 官方说明](https://support.apple.com/en-us/102445)
 
@@ -194,9 +210,18 @@ HoverCapture 使用 Apple ScreenCaptureKit 获取静态图片，在本机编码�
 
 ## 更新与卸载
 
-**更新：** 从菜单栏退出 HoverCapture，用新版本替换“应用程序”里的旧版本，再重新启动。原有设置和截图会保留。替换 ad-hoc 签名版本后，请重新检查屏幕录制和登录启动权限。
+**更新：** 从菜单栏完全退出 HoverCapture（关闭设置窗口不算退出）。手动安装的用户用新版覆盖“应用程序”里的旧版，再打开同一份应用。Homebrew 用户使用：
+
+```sh
+brew update
+brew upgrade --cask gesangtajie/tap/hovercapture
+```
+
+原有设置和已保存截图会保留。更新后先试截一张；若权限正常，无需移除授权。只有系统开关已开、应用却显示“需要授权”时，才在“隐私与安全性”中移除 HoverCapture 旧条目，添加准确的新版应用，再选择“退出并重新打开”。不需要彻底卸载，也不需要清空设置或截图。临时签名版本更新后可能需要这一步，Homebrew 不会改变该限制。另请检查登录启动状态。
 
 **卸载：** 先关闭登录时启动，从菜单栏退出应用，再把“应用程序”里的 HoverCapture 移到废纸篓。如需清理授权，可以在系统设置中移除其屏幕录制条目。截图和偏好设置默认保留，需要时单独清理即可。
+
+如果通过 Homebrew 安装，请退出后使用 `brew uninstall --cask hovercapture`，不要手动移走。本 tap 不会自动清空截图、偏好设置或重置系统授权。
 
 ## 从源码构建
 
@@ -206,15 +231,14 @@ HoverCapture 使用 Apple ScreenCaptureKit 获取静态图片，在本机编码�
 
 ```sh
 ./scripts/test.sh
-./scripts/build.sh
 ./scripts/package.sh
 ```
 
-应用输出到 `build/HoverCapture.app`，安装包输出为：
+打包脚本会先重新构建当前源码，应用输出到 `build/HoverCapture.app`。仅构建、不打包可运行 `./scripts/build.sh`。安装包输出为：
 
 ```text
-dist/HoverCapture-0.2.0-universal.dmg
-dist/HoverCapture-0.2.0-universal.zip
+dist/HoverCapture-0.2.1-universal.dmg
+dist/HoverCapture-0.2.1-universal.zip
 dist/SHA256SUMS.txt
 ```
 

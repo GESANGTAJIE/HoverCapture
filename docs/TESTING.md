@@ -4,6 +4,18 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
+## 0.2.1 recovery and packaging / 异常恢复与打包
+
+On 2026-10-13, the pending-login and stale-package regressions failed before their fixes. After the fixes, the local suite passed **83 checks**: the existing 70 model checks, 11 login-state/action/error checks, and 2 packaging regression checks. Native pasteboard integration remained explicitly skipped in the restricted local shell. Universal compilation, strict build-time signing verification, and ZIP packaging passed.
+
+The capture callback is now a required, immutable HotKeyController constructor argument, so a failed first registration cannot skip its installation. Login settings use the tested action mapping and expose pending approval separately, with an explicit route to System Settings. Packaging always runs a fresh build and stops if that build fails even when an old app exists. The tests verify login state/action selection without modifying actual macOS login items. Live shortcut-conflict recovery and login approval/cancellation still need GUI acceptance; these tests are not substitutes for it.
+
+2026-10-13：待批准登录项与旧构建打包的回归检查在修复前失败，修复后本地 **83 项通过**（原 70 项、登录项状态／操作／错误 11 项、打包回归 2 项）。受限终端仍明确跳过原生剪贴板集成；通用架构编译、构建时严格签名校验与 ZIP 打包通过。快捷键回调改为构造时必填、不可变，初次注册失败不会遗漏回调。登录项测试没有修改系统实际登录项；真实快捷键冲突恢复和登录项批准／取消仍待 GUI 验收。
+
+The 0.2.0 release was freshly tested on the same date: a physical default shortcut produced one target-only 1172 × 952 PNG of the public test document, and Preview's New from Clipboard showed the matching image. This is evidence for 0.2.0, not a full capture acceptance result for the rebuilt 0.2.1.
+
+同日已补测 0.2.0 发布版：实体快捷键产生一张 1172 × 952 的测试文稿窗口 PNG，Preview 从剪贴板新建显示同图。这是 0.2.0 的实测证据，不当作重建的 0.2.1 完整截图流程通过。
+
 ## 0.2.0 batch, language, and interface / 连续截图、语言与界面
 
 Verified on 2026-10-12 on macOS 15.7.2, Apple Silicon:

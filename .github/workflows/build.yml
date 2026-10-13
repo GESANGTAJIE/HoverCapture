@@ -12,9 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Logic and native clipboard tests
         run: bash scripts/test.sh --require-pasteboard
-      - name: Build universal application
-        run: bash scripts/build.sh
-      - name: Package application
+      - name: Build and package universal application
         run: bash scripts/package.sh
       - uses: actions/upload-artifact@v4
         with:

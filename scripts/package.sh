@@ -8,7 +8,8 @@ if [[ "${1:-}" != "" && "${1:-}" != "--zip-only" ]]; then
     printf 'Usage: %s [--zip-only]\n' "$0" >&2
     exit 2
 fi
-if [[ ! -d "$APP" ]]; then bash "$ROOT/scripts/build.sh"; fi
+# Never publish a cached app under the current source version's filename.
+bash "$ROOT/scripts/build.sh"
 xattr -cr "$APP"
 codesign --verify --deep --strict "$APP"
 mkdir -p "$ROOT/dist"

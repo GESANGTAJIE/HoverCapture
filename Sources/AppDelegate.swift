@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
     private var permissionLabel: NSTextField?
     private var shortcutButton: ShortcutButton?
     private var loginButton: NSButton?
+    private var loginApprovalButton: NSButton?
     private var capacityField: NSTextField?
     private var capacityStepper: NSStepper?
     private var batchLabel: NSTextField?
@@ -41,16 +42,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
         statusItem.menu = NSMenu()
         statusItem.menu?.delegate = self
         do {
-            hotKeys = try HotKeyController()
-            try hotKeys?.register(savedShortcut)
-            hotKeys?.onPress = { [weak self] in
+            hotKeys = try HotKeyController(onPress: { [weak self] in
                 guard let self else { return }
                 if self.shortcutButton?.isRecording == true {
                     self.shortcutButton?.cancelRecording()
                 } else {
                     self.takeScreenshot()
                 }
-            }
+            })
+            try hotKeys?.register(savedShortcut)
         } catch {
             NSLog("HoverCapture: hotkey setup failed: %@", error.localizedDescription)
             if CommandLine.arguments.contains("--smoke-test") { exit(1) }
@@ -308,7 +308,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
         let login = NSButton(checkboxWithTitle: AppText.pick("登录时自动启动 HoverCapture", "Launch HoverCapture at login"), target: self, action: #selector(toggleLogin))
         login.contentTintColor = AppTheme.black
         loginButton = login
-        stack.addArrangedSubview(login)
+        let approval = button(AppText.pick("打开登录项设置", "Open Login Items"), #selector(openLoginItems))
+        loginApprovalButton = approval
+        let loginRow = NSStackView(views: [login, NSView(), approval])
+        loginRow.widthAnchor.constraint(equalToConstant: 700).isActive = true
+        stack.addArrangedSubview(loginRow)
         stack.addArrangedSubview(divider())
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         let footer = NSStackView(views: [AppTheme.label("v\(version) · MIT", size: 12, color: AppTheme.secondary), NSView(),
@@ -375,7 +379,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
         permissionLabel?.stringValue = CGPreflightScreenCaptureAccess()
             ? AppText.pick("已允许", "Allowed") : AppText.pick("需要授权", "Permission needed")
         permissionLabel?.textColor = CGPreflightScreenCaptureAccess() ? AppTheme.secondary : AppTheme.orange
-        loginButton?.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        let loginStatus = SMAppService.mainApp.status
+        loginButton?.state = LoginItemSettings.isRegistered(loginStatus) ? .on : .off
+        loginButton?.title = loginStatus == .requiresApproval
+            ? AppText.pick("登录时自动启动（待系统批准）", "Launch at login (approval needed)")
+            : AppText.pick("登录时自动启动 HoverCapture", "Launch HoverCapture at login")
+        loginApprovalButton?.isHidden = loginStatus != .requiresApproval
         batchLabel?.stringValue = AppText.pick("待粘贴 \(engine.batch.count) / \(engine.batch.capacity) 张", "Batch: \(engine.batch.count) / \(engine.batch.capacity)")
         batchButtons.forEach { $0.isEnabled = engine.batch.count > 0 }
         capacityField?.integerValue = engine.batch.capacity
@@ -463,12 +472,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
 
     @objc private func toggleLogin() {
         do {
-            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() }
-            else { try SMAppService.mainApp.register() }
+            try LoginItemSettings.toggle(SMAppService.mainApp)
         } catch { showError(error.localizedDescription) }
         refreshSettings()
         if SMAppService.mainApp.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
     }
+
+    @objc private func openLoginItems() { SMAppService.openSystemSettingsLoginItems() }
 
     @objc private func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
