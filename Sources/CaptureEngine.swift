@@ -11,8 +11,12 @@ struct CaptureResult {
 @MainActor
 final class CaptureEngine {
     let batch = CaptureBatch()
+    private(set) var lastDiagnostic: String?
+
+    func clearDiagnostic() { lastDiagnostic = nil }
 
     func capture(directory: URL) async throws -> CaptureResult {
+        clearDiagnostic()
         guard CGPreflightScreenCaptureAccess() else {
             throw failure("请在系统设置中允许 HoverCapture 录制屏幕，然后完全退出并重新打开软件。",
                           "Allow Screen Recording for HoverCapture in System Settings, then quit and reopen the app.")
@@ -89,6 +93,7 @@ final class CaptureEngine {
         }
         var windows: [CaptureWindow] = []
         var desktopProcesses: [Int32: Bool] = [:]
+        var ownerBundleIDs: [Int32: String] = [:]
         for entry in entries {
             guard let id = entry[kCGWindowNumber as String] as? NSNumber,
                   let pid = entry[kCGWindowOwnerPID as String] as? NSNumber,
@@ -103,6 +108,7 @@ final class CaptureEngine {
             if desktopProcesses[ownerPID] == nil {
                 let bundleID = NSRunningApplication(processIdentifier: ownerPID)?.bundleIdentifier
                 desktopProcesses[ownerPID] = bundleID == "com.apple.dock"
+                if let bundleID { ownerBundleIDs[ownerPID] = bundleID }
             }
             windows.append(CaptureWindow(id: id.uint32Value, ownerPID: ownerPID,
                                          bounds: rect, layer: layer.intValue, alpha: alpha.doubleValue,
@@ -123,8 +129,16 @@ final class CaptureEngine {
             CaptureDisplay(id: $0, bounds: CGDisplayBounds($0))
         }
         do {
-            return try CaptureSelection.target(at: point, windows: windows, displays: displays,
-                                               ownPID: ProcessInfo.processInfo.processIdentifier)
+            let ownPID = ProcessInfo.processInfo.processIdentifier
+            let decision = try CaptureSelection.decision(at: point, windows: windows, displays: displays,
+                                                         ownPID: ownPID)
+            lastDiagnostic = CaptureDiagnostics.report(
+                point: point, windows: windows, displays: displays, decision: decision,
+                ownerBundleIDs: ownerBundleIDs, ownPID: ownPID,
+                appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
+                buildVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown",
+                systemVersion: ProcessInfo.processInfo.operatingSystemVersionString)
+            return decision.target
         } catch {
             throw failure("无法确定有效的截图目标（\(error)），已取消截图。",
                           "Could not determine a valid capture target (\(error)). Capture was canceled.")

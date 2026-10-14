@@ -7,6 +7,10 @@ xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
     -o "$ROOT/build/selection-tests"
 "$ROOT/build/selection-tests"
 xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
+    "$ROOT/Sources/CaptureSelection.swift" "$ROOT/Sources/CaptureDiagnostics.swift" \
+    "$ROOT/Tests/DiagnosticsTests.swift" -o "$ROOT/build/diagnostics-tests"
+"$ROOT/build/diagnostics-tests"
+xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
     "$ROOT/Sources/AppLanguage.swift" "$ROOT/Tests/LanguageTests.swift" \
     -o "$ROOT/build/language-tests"
 "$ROOT/build/language-tests"

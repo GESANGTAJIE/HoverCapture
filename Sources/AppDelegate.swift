@@ -91,6 +91,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
         }
         addItem(menu, AppText.pick("打开截图文件夹", "Open Screenshots Folder"), #selector(openFolder))
         addItem(menu, AppText.pick("屏幕录制权限…", "Screen Recording Permission…"), #selector(openPrivacy))
+        let diagnostic = NSMenuItem(title: AppText.pick("复制上次截图诊断", "Copy Last Capture Diagnosis"),
+                                    action: engine.lastDiagnostic == nil || isCapturing ? nil : #selector(copyDiagnostic),
+                                    keyEquivalent: "")
+        diagnostic.target = self
+        menu.addItem(diagnostic)
         menu.addItem(.separator())
         addItem(menu, AppText.pick("关于 HoverCapture", "About HoverCapture"), #selector(showAbout))
         addItem(menu, AppText.pick("退出 HoverCapture", "Quit HoverCapture"), #selector(quit), key: "q")
@@ -104,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
 
     private func takeScreenshot() {
         guard !isCapturing else { return }
+        engine.clearDiagnostic()
         guard CGPreflightScreenCaptureAccess() else {
             showSettings()
             showError(AppText.pick("请先开启 HoverCapture 的屏幕录制权限。授权后如仍不可用，请退出并重新打开应用。",
@@ -486,6 +492,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSText
             .applicationName: "HoverCapture",
             .credits: NSAttributedString(string: AppText.pick("共同作者：ChesterGe 与 GPT（OpenAI）\n开源窗口截图工具 · MIT 许可证\n界面图标：Lucide（ISC / MIT）", "Co-authors: ChesterGe and GPT (OpenAI)\nOpen-source window screenshots · MIT License\nInterface icons: Lucide (ISC / MIT)"))
         ])
+    }
+
+    @objc private func copyDiagnostic() {
+        guard !isCapturing else {
+            showError(AppText.pick("请等待截图完成后再复制诊断。", "Wait for capture to finish before copying the diagnosis."))
+            return
+        }
+        guard let report = engine.lastDiagnostic else {
+            showError(AppText.pick("请先用快捷键截图，再复制诊断。", "Capture with the shortcut before copying a diagnosis."))
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        guard pasteboard.setString(report, forType: .string) else {
+            showError(AppText.pick("诊断文字复制失败，请重试。", "Could not copy the diagnosis. Try again."))
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = AppText.pick("诊断文字已复制", "Diagnosis Copied")
+        alert.informativeText = AppText.pick(
+            "请把文字粘贴给开发者。包含版本、应用标识与窗口坐标，不含截图图片、窗口标题或文档路径，也不会自动上传。\n\n诊断文字已替换剪贴板内容。",
+            "Paste the text to the developer. It includes versions, app identifiers and window coordinates, with no screenshot pixels, window titles, document paths or automatic uploads.\n\nThe diagnosis has replaced the clipboard contents.")
+        if engine.batch.count > 0 {
+            alert.informativeText += AppText.pick("可用“复制整组”重新复制截图。", " Use Copy Batch to copy the screenshots again.")
+        }
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: AppText.pick("好", "OK"))
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private func showError(_ message: String) {

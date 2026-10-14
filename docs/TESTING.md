@@ -4,7 +4,23 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
-## 0.2.2 candidate: Tahoe Dock / 候选版：Tahoe 程序坞
+## 0.2.2 RC2 diagnostics / RC2 诊断
+
+The affected M1/Tahoe 26.1 user tested RC1 and reported that hovering an ordinary window still captures the screen. The synthetic RC1 regression passing did not establish the actual device's window signature. **RC1 acceptance failed.** RC2 (build 6) leaves selection behavior unchanged and adds an explicit Copy Last Capture Diagnosis menu action.
+
+The selector produces the actual target, reason, decisive window index and skipped Dock IDs in one operation. The report uses that result and the exact frozen inputs from the same capture, including relevant windows behind the blocker. Copying later does not re-read the pointer or window list. Unknown bundle IDs and sharing states stay unknown. The report contains no window titles, owner display names, paths or pixels; one report is retained in memory until the next attempt or app exit. No automatic file write or upload occurs. Copying is explicit and replaces clipboard contents; the screenshot batch is unchanged.
+
+User workflow: install RC2, leave Dock visible, hover Finder, press the capture shortcut, choose Copy Last Capture Diagnosis, and send the text. Verify the text says `appVersion=0.2.2 build=6`. The menu is unavailable before a target snapshot; early failures clear a previous report. Homebrew remains on 0.2.1 pending diagnosis and a verified fix.
+
+用户实测 RC1 后仍然全屏，**RC1 未通过受影响设备验收**。RC2（构建 6）保持选择行为不变，增加手动复制最近一次目标诊断。报告使用同次截图冻结的坐标、窗口列表和实际选择结果，不在点菜单时重新取样；保留未知字段的“未知”状态。报告仅在内存保留一份，不含窗口标题、进程显示名称、路径或图片，无自动写文件／上传。复制文字会替换剪贴板，不清空截图批次。
+
+待用户提供 RC2 报告，首先核对 `appVersion=0.2.2 build=6`，再检查实际阻挡窗口及其元数据。Homebrew 保留 0.2.1。
+
+Local verification: 128 checks passed (45 selection, 27 diagnostics, 18 language, 25 batch model, 11 login, 2 packaging); native pasteboard integration was explicitly skipped by the restricted shell. Diagnostic tests cover actual decision reasons/indexes, unknown metadata, windows behind a blocker, irrelevant-window omission, negative coordinates and non-finite diagnostic values. The original 45 selection expectations still pass. Menu availability and diagnostic copying on the affected Tahoe device remain pending. Copying is disabled while capture is in progress to prevent image delivery replacing the copied report.
+
+本地 128 项通过（选择 45、诊断 27、语言 18、批次 25、登录项 11、打包 2）；受限终端跳过原生剪贴板集成。原有选择结果保持通过。截图进行中禁用诊断复制，避免截图随后覆盖刚复制的文字。受影响 Tahoe 设备上的菜单与报告复制尚待确认。
+
+## 0.2.2 RC1: Tahoe Dock / RC1：Tahoe 程序坞
 
 On 2026-10-14, a user reported that every capture over an ordinary Finder window on an M1 MacBook Pro running macOS Tahoe 26.1 produced a new `Screen-` PNG. No third-party overlay utilities were in use. With the existing app unchanged, enabling Dock autohide restored `Window-` captures. This isolates a Dock-related selection failure; the affected Mac's precise window metadata has not been collected.
 
@@ -14,11 +30,11 @@ Regression coverage includes multiple pointer positions, negative-origin display
 
 Local verification on 2026-10-14: **101 checks passed, 0 failed** (45 selection, 18 language, 25 batch model, 11 login, 2 packaging). The restricted shell explicitly skipped native pasteboard integration. Universal arm64/x86_64 compilation, strict signature verification, and ZIP packaging passed. These do not establish the candidate's capture behavior on the affected Tahoe Mac.
 
-**Pending candidate acceptance:** install the candidate on the affected Mac, keep Dock visible, verify an ordinary Finder window produces `Window-`; point at empty desktop and confirm `Screen-`; check the visible Dock, Dock menus, and Mission Control. Do not promote the Homebrew cask based solely on unit-test results.
+**RC1 acceptance failed:** the user reported that an ordinary window still produces `Screen-` with Dock visible. The other proposed Dock/menu/Mission Control checks remain unverified. Do not promote the Homebrew cask based solely on unit-test results.
 
 2026-10-14：用户确认 M1 MacBook Pro、Tahoe 26.1 上普通 Finder 窗口总生成 `Screen-`；没有使用第三方覆盖工具。保持旧应用不变，开启 Dock 自动隐藏后恢复 `Window-`，已定位到 Dock 相关判断，但未取得该机器的具体窗口元数据。新增模拟回归在修复前失败。修复仅跳过 Dock、层级 20、共享状态 0、空标题且边界等于单块显示器的组合，不把“共享状态 0”等同于不可见。
 
-**候选版待实机验收：** Dock 显示时截 Finder 为 `Window-`，桌面空白为 `Screen-`，并复查真实 Dock 区域、Dock 菜单和 Mission Control。通过前不更新 Homebrew。
+**RC1 实机验收失败：** 用户反馈 Dock 显示时普通窗口仍生成 `Screen-`。其他 Dock／菜单／Mission Control 验收未完成，不更新 Homebrew。
 
 本地验证：**101 项通过，0 失败**（窗口选择 45、语言 18、批次 25、登录项 11、打包 2）。受限终端明确跳过原生剪贴板集成；双架构编译、严格签名检查和 ZIP 打包通过，不等同于 Tahoe 实机截图验收。
 

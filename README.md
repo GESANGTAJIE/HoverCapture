@@ -8,11 +8,13 @@ Point at a Mac window. Press one shortcut. Get a screenshot of that window, save
 
 HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon, a browser extension, or a background command-line service.
 
-## 0.2.2 release candidate — Tahoe Dock compatibility
+## 0.2.2 diagnostic candidate — Tahoe Dock investigation
 
-[Download the candidate](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.1). It narrowly excludes the Dock's untitled, non-shareable, layer-20 tracking surface when its bounds exactly match one display. Visible Dock strips, menus, and other overlays retain their existing behavior.
+[Download RC2 (build 6)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.2). **RC1 did not resolve the affected user's full-screen selection. RC2 adds diagnostics; it does not claim another fix.** Its selection rules are unchanged from RC1.
 
-On an M1 Mac running Tahoe 26.1, a user confirmed that hiding the Dock changes erroneous full-screen captures back to window captures in 0.2.1. **The new candidate still needs confirmation on that Mac with the Dock visible.** Homebrew remains on 0.2.1 until that check. Temporary workaround for affected users: enable System Settings → Desktop & Dock → Automatically hide and show the Dock, wait until it hides, then capture over an ordinary window. No permission reset is needed for this test.
+On an M1 Mac running Tahoe 26.1, a user confirmed that hiding the Dock restores window selection. Homebrew remains on 0.2.1. To collect evidence with RC2: keep Dock visible, hover an ordinary Finder window, press the capture shortcut, then select **Copy Last Capture Diagnosis** from the HoverCapture menu and paste the text into your bug report. The diagnosis is frozen at the capture, retained only in memory, and contains versions, application identifiers, pointer/window coordinates, and selection reasons. It excludes screenshot pixels, window titles and document paths, and is never uploaded automatically. Copying replaces clipboard content; Copy Batch restores retained screenshots. No report is available before a capture target has been determined.
+
+Temporary workaround: enable System Settings → Desktop & Dock → Automatically hide and show the Dock, wait until it hides, then capture over an ordinary window. No permission reset is needed for this workaround.
 
 ## 0.2.1 preview
 

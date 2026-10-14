@@ -27,15 +27,32 @@ enum CaptureSelectionError: Error, Equatable {
     case noDisplay
 }
 
+enum CaptureSelectionReason: String {
+    case window, desktopElement, ownWindow, unsupportedLayer, noWindow
+}
+
+struct CaptureDecision: Equatable {
+    let target: CaptureTarget
+    let reason: CaptureSelectionReason
+    let windowIndex: Int?
+    let skippedDockWindowIDs: [CGWindowID]
+}
+
 enum CaptureSelection {
     // WindowServer supplies these windows from front to back. Stop at the first
     // visible surface: a menu must not expose a window behind it as the target.
     static func target(at point: CGPoint, windows: [CaptureWindow],
                        displays: [CaptureDisplay], ownPID: Int32) throws -> CaptureTarget {
+        try decision(at: point, windows: windows, displays: displays, ownPID: ownPID).target
+    }
+
+    static func decision(at point: CGPoint, windows: [CaptureWindow],
+                         displays: [CaptureDisplay], ownPID: Int32) throws -> CaptureDecision {
         guard point.x.isFinite, point.y.isFinite else {
             throw CaptureSelectionError.invalidPointer
         }
-        for window in windows {
+        var skippedDockWindowIDs: [CGWindowID] = []
+        for (index, window) in windows.enumerated() {
             guard window.alpha.isFinite, valid(window.bounds) else {
                 throw CaptureSelectionError.invalidWindow
             }
@@ -47,18 +64,24 @@ enum CaptureSelection {
             if window.isDesktopElement, window.layer == 20, window.sharingState == 0,
                !window.hasTitle,
                displays.contains(where: { $0.id != 0 && $0.bounds == window.bounds }) {
+                skippedDockWindowIDs.append(window.id)
                 continue
             }
             if window.isDesktopElement || window.ownerPID == ownPID ||
                 ![0, 3, 8].contains(window.layer) {
-                return try screen(at: point, displays: displays)
+                let reason: CaptureSelectionReason = window.isDesktopElement ? .desktopElement
+                    : (window.ownerPID == ownPID ? .ownWindow : .unsupportedLayer)
+                return CaptureDecision(target: try screen(at: point, displays: displays), reason: reason,
+                                       windowIndex: index, skippedDockWindowIDs: skippedDockWindowIDs)
             }
             guard window.id != 0, window.ownerPID > 0 else {
                 throw CaptureSelectionError.invalidWindow
             }
-            return .window(id: window.id, ownerPID: window.ownerPID)
+            return CaptureDecision(target: .window(id: window.id, ownerPID: window.ownerPID), reason: .window,
+                                   windowIndex: index, skippedDockWindowIDs: skippedDockWindowIDs)
         }
-        return try screen(at: point, displays: displays)
+        return CaptureDecision(target: try screen(at: point, displays: displays), reason: .noWindow,
+                               windowIndex: nil, skippedDockWindowIDs: skippedDockWindowIDs)
     }
 
     private static func screen(at point: CGPoint, displays: [CaptureDisplay]) throws -> CaptureTarget {
