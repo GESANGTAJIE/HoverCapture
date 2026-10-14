@@ -106,7 +106,9 @@ final class CaptureEngine {
             }
             windows.append(CaptureWindow(id: id.uint32Value, ownerPID: ownerPID,
                                          bounds: rect, layer: layer.intValue, alpha: alpha.doubleValue,
-                                         isDesktopElement: desktopProcesses[ownerPID] == true))
+                                         isDesktopElement: desktopProcesses[ownerPID] == true,
+                                         sharingState: (entry[kCGWindowSharingState as String] as? NSNumber)?.intValue,
+                                         hasTitle: (entry[kCGWindowName as String] as? String)?.isEmpty == false))
         }
 
         var displayCount: UInt32 = 0

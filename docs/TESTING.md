@@ -4,6 +4,24 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
+## 0.2.2 candidate: Tahoe Dock / 候选版：Tahoe 程序坞
+
+On 2026-10-14, a user reported that every capture over an ordinary Finder window on an M1 MacBook Pro running macOS Tahoe 26.1 produced a new `Screen-` PNG. No third-party overlay utilities were in use. With the existing app unchanged, enabling Dock autohide restored `Window-` captures. This isolates a Dock-related selection failure; the affected Mac's precise window metadata has not been collected.
+
+The new regression failed before the selector fix: a Dock-owned, untitled, layer-20, sharing-state-0 window matching the entire display forced screen capture even when the pointer was over an ordinary app window. This is a synthetic fixture based on [a primary report of the signature on later Tahoe versions](https://github.com/anthropics/claude-code/issues/50719), not a metadata dump from the affected 26.1 Mac. The fix skips only that full signature and continues through the existing window order. Sharing state alone is not a visibility test.
+
+Regression coverage includes multiple pointer positions, negative-origin displays, empty desktop, real Dock strips, menus, Mission Control's layer 18, non-Dock overlays, sharing/ title/ bounds mismatches, and a normal full-display window. Native metadata extraction uses bundle ID from PID and does not depend on localized owner names. Missing sharing-state data keeps the original conservative behavior.
+
+Local verification on 2026-10-14: **101 checks passed, 0 failed** (45 selection, 18 language, 25 batch model, 11 login, 2 packaging). The restricted shell explicitly skipped native pasteboard integration. Universal arm64/x86_64 compilation, strict signature verification, and ZIP packaging passed. These do not establish the candidate's capture behavior on the affected Tahoe Mac.
+
+**Pending candidate acceptance:** install the candidate on the affected Mac, keep Dock visible, verify an ordinary Finder window produces `Window-`; point at empty desktop and confirm `Screen-`; check the visible Dock, Dock menus, and Mission Control. Do not promote the Homebrew cask based solely on unit-test results.
+
+2026-10-14：用户确认 M1 MacBook Pro、Tahoe 26.1 上普通 Finder 窗口总生成 `Screen-`；没有使用第三方覆盖工具。保持旧应用不变，开启 Dock 自动隐藏后恢复 `Window-`，已定位到 Dock 相关判断，但未取得该机器的具体窗口元数据。新增模拟回归在修复前失败。修复仅跳过 Dock、层级 20、共享状态 0、空标题且边界等于单块显示器的组合，不把“共享状态 0”等同于不可见。
+
+**候选版待实机验收：** Dock 显示时截 Finder 为 `Window-`，桌面空白为 `Screen-`，并复查真实 Dock 区域、Dock 菜单和 Mission Control。通过前不更新 Homebrew。
+
+本地验证：**101 项通过，0 失败**（窗口选择 45、语言 18、批次 25、登录项 11、打包 2）。受限终端明确跳过原生剪贴板集成；双架构编译、严格签名检查和 ZIP 打包通过，不等同于 Tahoe 实机截图验收。
+
 ## 0.2.1 recovery and packaging / 异常恢复与打包
 
 On 2026-10-13, the pending-login and stale-package regressions failed before their fixes. After the fixes, the local suite passed **83 checks**: the existing 70 model checks, 11 login-state/action/error checks, and 2 packaging regression checks. Native pasteboard integration remained explicitly skipped in the restricted local shell. Universal compilation, strict build-time signing verification, and ZIP packaging passed.

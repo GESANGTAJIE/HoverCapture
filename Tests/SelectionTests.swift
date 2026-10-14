@@ -54,6 +54,64 @@ struct SelectionTests {
         try expect("window bottom edge excluded", [window(11)], .screen(id: 1), at: CGPoint(x: 150, y: 500))
         try expect("window on left display", [window(11, x: -600)], .window(id: 11, ownerPID: 42), at: CGPoint(x: -500, y: 150))
         try expect("window on upper display", [window(11, y: -500)], .window(id: 11, ownerPID: 42), at: CGPoint(x: 150, y: -300))
+
+        // Tahoe's Dock may expose an untitled, unshareable, full-display tracking
+        // surface above app windows. It is not the visible Dock strip.
+        let dockTracking = CaptureWindow(id: 20, ownerPID: 55, bounds: main.bounds,
+                                         layer: 20, alpha: 1, isDesktopElement: true,
+                                         sharingState: 0, hasTitle: false)
+        for point in [CGPoint(x: 150, y: 150), CGPoint(x: 300, y: 300), CGPoint(x: 550, y: 450)] {
+            try expect("Dock tracking surface does not hide window at \(point)",
+                       [dockTracking, window(11)], .window(id: 11, ownerPID: 42), at: point)
+        }
+        try expect("Dock tracking over desktop still captures screen", [dockTracking], .screen(id: 1))
+        let leftTracking = CaptureWindow(id: 21, ownerPID: 55, bounds: left.bounds,
+                                         layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
+        try expect("Dock tracking on negative X display", [leftTracking, window(11, x: -600)],
+                   .window(id: 11, ownerPID: 42), at: CGPoint(x: -500, y: 150))
+        let aboveTracking = CaptureWindow(id: 22, ownerPID: 55, bounds: above.bounds,
+                                          layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
+        try expect("Dock tracking on negative Y display", [aboveTracking, window(11, y: -500)],
+                   .window(id: 11, ownerPID: 42), at: CGPoint(x: 150, y: -300))
+
+        var otherOwner = dockTracking
+        otherOwner.isDesktopElement = false
+        try expect("unknown full-display overlay still blocks", [otherOwner, window(11)], .screen(id: 1))
+        var namedDock = dockTracking
+        namedDock.hasTitle = true
+        try expect("named Dock overlay still blocks", [namedDock, window(11)], .screen(id: 1))
+        for state: Int? in [nil, 1, 2] {
+            var otherSharing = dockTracking
+            otherSharing.sharingState = state
+            try expect("Dock with sharing state \(String(describing: state)) still blocks",
+                       [otherSharing, window(11)], .screen(id: 1))
+        }
+        let dockStrip = CaptureWindow(id: 23, ownerPID: 55,
+                                      bounds: CGRect(x: 100, y: 800, width: 1000, height: 100),
+                                      layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
+        try expect("visible Dock strip still blocks", [dockTracking, dockStrip, window(11, y: 600)],
+                   .screen(id: 1), at: CGPoint(x: 150, y: 850))
+        let dockMenu = CaptureWindow(id: 24, ownerPID: 55,
+                                     bounds: CGRect(x: 100, y: 100, width: 500, height: 400),
+                                     layer: 101, alpha: 1, isDesktopElement: true, sharingState: 0)
+        try expect("Dock menu still blocks", [dockMenu, dockTracking, window(11)], .screen(id: 1))
+        let otherDockLayer = CaptureWindow(id: 25, ownerPID: 55, bounds: main.bounds,
+                                           layer: 101, alpha: 1, isDesktopElement: true, sharingState: 0)
+        try expect("full-display Dock at another layer still blocks", [otherDockLayer, window(11)], .screen(id: 1))
+        let missionControl = CaptureWindow(id: 27, ownerPID: 55, bounds: main.bounds,
+                                           layer: 18, alpha: 1, isDesktopElement: true, sharingState: 0)
+        try expect("Mission Control layer still blocks", [missionControl, window(11)], .screen(id: 1))
+        let partialDock = CaptureWindow(id: 26, ownerPID: 55,
+                                        bounds: CGRect(x: 0, y: 0, width: 1440, height: 899),
+                                        layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
+        try expect("near-full-display Dock still blocks", [partialDock, window(11)], .screen(id: 1))
+        try expect("ordinary popup above tracking surface stays selected",
+                   [window(12, layer: 8), dockTracking, window(11)], .window(id: 12, ownerPID: 42))
+        let fullApp = CaptureWindow(id: 28, ownerPID: 42, bounds: main.bounds,
+                                    layer: 0, alpha: 1, sharingState: 0)
+        try expect("sharing-none ordinary fullscreen window remains eligible",
+                   [dockTracking, fullApp], .window(id: 28, ownerPID: 42))
+
         try expectFailure("invalid ID never captures screen", [window(0)], .invalidWindow)
         try expectFailure("invalid owner never captures screen", [window(11, pid: 0)], .invalidWindow)
         try expectFailure("invalid pointer", [], .invalidPointer, at: CGPoint(x: CGFloat.nan, y: 100))

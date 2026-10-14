@@ -8,6 +8,12 @@ Point at a Mac window. Press one shortcut. Get a screenshot of that window, save
 
 HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon, a browser extension, or a background command-line service.
 
+## 0.2.2 release candidate — Tahoe Dock compatibility
+
+[Download the candidate](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.1). It narrowly excludes the Dock's untitled, non-shareable, layer-20 tracking surface when its bounds exactly match one display. Visible Dock strips, menus, and other overlays retain their existing behavior.
+
+On an M1 Mac running Tahoe 26.1, a user confirmed that hiding the Dock changes erroneous full-screen captures back to window captures in 0.2.1. **The new candidate still needs confirmation on that Mac with the Dock visible.** Homebrew remains on 0.2.1 until that check. Temporary workaround for affected users: enable System Settings → Desktop & Dock → Automatically hide and show the Dock, wait until it hides, then capture over an ordinary window. No permission reset is needed for this test.
+
 ## 0.2.1 preview
 
 Fixes shortcut recovery after a startup conflict and cancellation of login items awaiting approval. Packaging now always rebuilds the current source, preventing stale apps from being shipped under a new version label. Homebrew installation is available through our own tap (see below).
@@ -212,8 +218,8 @@ From a checkout of this repository:
 The package script always builds the current source first. The app is built at `build/HoverCapture.app`; for a build without packaging, use `./scripts/build.sh`. The package script produces:
 
 ```text
-dist/HoverCapture-0.2.1-universal.dmg
-dist/HoverCapture-0.2.1-universal.zip
+dist/HoverCapture-0.2.2-universal.dmg
+dist/HoverCapture-0.2.2-universal.zip
 dist/SHA256SUMS.txt
 ```
 

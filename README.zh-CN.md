@@ -8,6 +8,12 @@
 
 HoverCapture 是原生 macOS 菜单栏应用，不需要 Hammerspoon、浏览器扩展或单独运行的命令行服务。
 
+## 0.2.2 候选版：Tahoe 程序坞兼容
+
+[下载候选版](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.1)。只跳过同时符合以下特征的 Dock 检测层：没有标题、不可共享、层级为 20、边界与一块显示器完全一致。真正可见的程序坞条、菜单和其他覆盖窗口保留原有行为。
+
+用户已在 M1、Tahoe 26.1 上确认：0.2.1 原本始终截全屏，隐藏 Dock 后恢复窗口截图。**新版仍待这台机器在 Dock 保持显示时复测。** 确认前 Homebrew 保持 0.2.1。临时处理方法：在“系统设置 → 桌面与程序坞”开启“自动显示和隐藏程序坞”，等它隐藏后，再把鼠标放在普通窗口内截图。这项排查无需重置权限。
+
 ## 0.2.1 预览版
 
 修复启动时快捷键冲突后的恢复，以及待系统批准的登录启动项无法取消的问题。打包前始终重新构建当前源码，防止新版本名称对应旧程序。新增自有 Homebrew tap 安装方式，见下文。
@@ -237,8 +243,8 @@ brew upgrade --cask gesangtajie/tap/hovercapture
 打包脚本会先重新构建当前源码，应用输出到 `build/HoverCapture.app`。仅构建、不打包可运行 `./scripts/build.sh`。安装包输出为：
 
 ```text
-dist/HoverCapture-0.2.1-universal.dmg
-dist/HoverCapture-0.2.1-universal.zip
+dist/HoverCapture-0.2.2-universal.dmg
+dist/HoverCapture-0.2.2-universal.zip
 dist/SHA256SUMS.txt
 ```
 

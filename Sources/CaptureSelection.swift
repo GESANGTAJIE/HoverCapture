@@ -7,6 +7,8 @@ struct CaptureWindow: Equatable {
     let layer: Int
     let alpha: Double
     var isDesktopElement = false
+    var sharingState: Int? = nil
+    var hasTitle = false
 }
 
 struct CaptureDisplay: Equatable {
@@ -39,6 +41,14 @@ enum CaptureSelection {
             }
             guard window.layer >= 0, window.alpha > 0,
                   contains(window.bounds, point) else { continue }
+            // Tahoe's visible Dock can add an invisible full-display tracking
+            // surface. Match its complete signature, not all Dock/overlay windows;
+            // the visible Dock strip and menus must still block windows behind them.
+            if window.isDesktopElement, window.layer == 20, window.sharingState == 0,
+               !window.hasTitle,
+               displays.contains(where: { $0.id != 0 && $0.bounds == window.bounds }) {
+                continue
+            }
             if window.isDesktopElement || window.ownerPID == ownPID ||
                 ![0, 3, 8].contains(window.layer) {
                 return try screen(at: point, displays: displays)
