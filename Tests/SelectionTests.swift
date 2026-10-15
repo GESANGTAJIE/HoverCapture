@@ -15,9 +15,9 @@ struct SelectionTests {
                           layer: layer, alpha: alpha, isDesktopElement: desktop)
         }
         func expect(_ name: String, _ windows: [CaptureWindow], _ expected: CaptureTarget,
-                    at point: CGPoint = CGPoint(x: 150, y: 150), transparent: Set<CGWindowID> = []) throws {
+                    at point: CGPoint = CGPoint(x: 150, y: 150), native: Int? = nil) throws {
             let actual = try CaptureSelection.target(at: point, windows: windows, displays: displays,
-                                                     ownPID: 99, transparentDockWindowIDs: transparent)
+                                                     ownPID: 99, nativeWindowNumber: native)
             guard actual == expected else {
                 throw TestFailure(message: "\(name): expected \(expected), got \(actual)")
             }
@@ -56,29 +56,29 @@ struct SelectionTests {
         try expect("window on left display", [window(11, x: -600)], .window(id: 11, ownerPID: 42), at: CGPoint(x: -500, y: 150))
         try expect("window on upper display", [window(11, y: -500)], .window(id: 11, ownerPID: 42), at: CGPoint(x: 150, y: -300))
 
-        // Only a successful transparent-pixel probe allows a full-display Dock
-        // surface to be skipped. Metadata alone is not proof of transparency.
+        // A matching native mouse target behind a full-display Dock permits a
+        // skip. Metadata alone does not establish where mouse events would go.
         let dockTracking = CaptureWindow(id: 20, ownerPID: 55, bounds: main.bounds,
                                          layer: 20, alpha: 1, isDesktopElement: true,
                                          sharingState: 0, hasTitle: false)
         for point in [CGPoint(x: 150, y: 150), CGPoint(x: 300, y: 300), CGPoint(x: 550, y: 450)] {
             try expect("Dock tracking surface does not hide window at \(point)",
-                       [dockTracking, window(11)], .window(id: 11, ownerPID: 42), at: point, transparent: [20])
+                       [dockTracking, window(11)], .window(id: 11, ownerPID: 42), at: point, native: 11)
         }
         try expect("Dock metadata alone still blocks", [dockTracking, window(11)], .screen(id: 1))
-        try expect("Dock tracking over desktop still captures screen", [dockTracking], .screen(id: 1), transparent: [20])
+        try expect("Dock hit over desktop still captures screen", [dockTracking], .screen(id: 1), native: 20)
         let leftTracking = CaptureWindow(id: 21, ownerPID: 55, bounds: left.bounds,
                                          layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
         try expect("Dock tracking on negative X display", [leftTracking, window(11, x: -600)],
-                   .window(id: 11, ownerPID: 42), at: CGPoint(x: -500, y: 150), transparent: [21])
+                   .window(id: 11, ownerPID: 42), at: CGPoint(x: -500, y: 150), native: 11)
         let aboveTracking = CaptureWindow(id: 22, ownerPID: 55, bounds: above.bounds,
                                           layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
         try expect("Dock tracking on negative Y display", [aboveTracking, window(11, y: -500)],
-                   .window(id: 11, ownerPID: 42), at: CGPoint(x: 150, y: -300), transparent: [22])
+                   .window(id: 11, ownerPID: 42), at: CGPoint(x: 150, y: -300), native: 11)
 
         var otherOwner = dockTracking
         otherOwner.isDesktopElement = false
-        try expect("unknown full-display overlay still blocks", [otherOwner, window(11)], .screen(id: 1), transparent: [20])
+        try expect("unknown full-display overlay still blocks", [otherOwner, window(11)], .screen(id: 1), native: 11)
         var namedDock = dockTracking
         namedDock.hasTitle = true
         try expect("named Dock overlay still blocks", [namedDock, window(11)], .screen(id: 1))
@@ -92,27 +92,27 @@ struct SelectionTests {
                                       bounds: CGRect(x: 100, y: 800, width: 1000, height: 100),
                                       layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
         try expect("visible Dock strip still blocks", [dockTracking, dockStrip, window(11, y: 600)],
-                   .screen(id: 1), at: CGPoint(x: 150, y: 850), transparent: [20, 23])
+                   .screen(id: 1), at: CGPoint(x: 150, y: 850), native: 11)
         let dockMenu = CaptureWindow(id: 24, ownerPID: 55,
                                      bounds: CGRect(x: 100, y: 100, width: 500, height: 400),
                                      layer: 101, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("Dock menu still blocks", [dockMenu, dockTracking, window(11)], .screen(id: 1), transparent: [20, 24])
+        try expect("Dock menu still blocks", [dockMenu, dockTracking, window(11)], .screen(id: 1), native: 11)
         let otherDockLayer = CaptureWindow(id: 25, ownerPID: 55, bounds: main.bounds,
                                            layer: 101, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("full-display Dock at another layer still blocks", [otherDockLayer, window(11)], .screen(id: 1), transparent: [25])
+        try expect("full-display Dock at another layer still blocks", [otherDockLayer, window(11)], .screen(id: 1), native: 11)
         let missionControl = CaptureWindow(id: 27, ownerPID: 55, bounds: main.bounds,
                                            layer: 18, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("Mission Control layer still blocks", [missionControl, window(11)], .screen(id: 1), transparent: [27])
+        try expect("Mission Control layer still blocks", [missionControl, window(11)], .screen(id: 1), native: 11)
         let partialDock = CaptureWindow(id: 26, ownerPID: 55,
                                         bounds: CGRect(x: 0, y: 0, width: 1440, height: 899),
                                         layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("near-full-display Dock still blocks", [partialDock, window(11)], .screen(id: 1), transparent: [26])
+        try expect("near-full-display Dock still blocks", [partialDock, window(11)], .screen(id: 1), native: 11)
         try expect("ordinary popup above tracking surface stays selected",
-                   [window(12, layer: 8), dockTracking, window(11)], .window(id: 12, ownerPID: 42), transparent: [20])
+                   [window(12, layer: 8), dockTracking, window(11)], .window(id: 12, ownerPID: 42), native: 11)
         let fullApp = CaptureWindow(id: 28, ownerPID: 42, bounds: main.bounds,
                                     layer: 0, alpha: 1, sharingState: 0)
         try expect("sharing-none ordinary fullscreen window remains eligible",
-                   [dockTracking, fullApp], .window(id: 28, ownerPID: 42), transparent: [20])
+                   [dockTracking, fullApp], .window(id: 28, ownerPID: 42), native: 28)
 
         try expectFailure("invalid ID never captures screen", [window(0)], .invalidWindow)
         try expectFailure("invalid owner never captures screen", [window(11, pid: 0)], .invalidWindow)

@@ -22,13 +22,13 @@ struct DiagnosticsTests {
                           isDesktopElement: desktop, sharingState: sharing, hasTitle: title)
         }
         func decide(_ windows: [CaptureWindow], at location: CGPoint? = nil,
-                    transparent: Set<CGWindowID> = []) throws -> CaptureDecision {
+                    native: Int? = nil) throws -> CaptureDecision {
             try CaptureSelection.decision(at: location ?? point, windows: windows,
-                                          displays: displays, ownPID: ownPID, transparentDockWindowIDs: transparent)
+                                          displays: displays, ownPID: ownPID, nativeWindowNumber: native)
         }
         func expect(_ name: String, _ windows: [CaptureWindow], target: CaptureTarget,
-                    reason: CaptureSelectionReason, index: Int?, skipped: [CGWindowID] = []) throws {
-            let actual = try decide(windows, transparent: Set(skipped))
+                    reason: CaptureSelectionReason, index: Int?, skipped: [CGWindowID] = [], native: Int? = nil) throws {
+            let actual = try decide(windows, native: native)
             try check(name, actual == CaptureDecision(target: target, reason: reason,
                                                      windowIndex: index, skippedDockWindowIDs: skipped))
         }
@@ -38,7 +38,7 @@ struct DiagnosticsTests {
                                       decision: decision,
                                       ownerBundleIDs: [42: "com.apple.finder", 55: "com.apple.dock",
                                                        77: "org.example.unrelated"], ownPID: ownPID,
-                                      appVersion: "0.2.2", buildVersion: "6", systemVersion: "26.1 (25B78)",
+                                      appVersion: "0.2.2", buildVersion: "8", systemVersion: "26.1 (25B78)",
                                       date: Date(timeIntervalSince1970: 0))
         }
 
@@ -56,27 +56,27 @@ struct DiagnosticsTests {
                    target: .screen(id: 1), reason: .noWindow, index: nil)
 
         let tracking = window(20, pid: 55, layer: 20, bounds: main.bounds, desktop: true, sharing: 0)
-        try expect("transparent Dock probe reports skip", [tracking, finder],
-                   target: .window(id: 11, ownerPID: 42), reason: .window, index: 1, skipped: [20])
-        try expect("tracking-only desktop preserves skip", [tracking],
-                   target: .screen(id: 1), reason: .noWindow, index: nil, skipped: [20])
+        try expect("native Finder hit reports Dock skip", [tracking, finder],
+                   target: .window(id: 11, ownerPID: 42), reason: .window, index: 1, skipped: [20], native: 11)
+        try expect("tracking-only desktop cannot invent skip", [tracking],
+                   target: .screen(id: 1), reason: .desktopElement, index: 0, native: 11)
         let missingSharing = window(21, pid: 55, layer: 20, bounds: main.bounds, desktop: true)
-        try expect("missing sharing state is not the exact tracking signature", [missingSharing, finder],
+        try expect("missing native hit leaves Dock blocked", [missingSharing, finder],
                    target: .screen(id: 1), reason: .desktopElement, index: 0)
         let nearBounds = window(22, pid: 55, layer: 20,
                                 bounds: CGRect(x: 0, y: 0, width: 1440, height: 899),
                                 desktop: true, sharing: 0)
         try expect("near-full-display bounds remain a blocker", [nearBounds, finder],
                    target: .screen(id: 1), reason: .desktopElement, index: 0)
-        try expect("later blocker retains earlier skip", [tracking, missingSharing, finder],
-                   target: .screen(id: 1), reason: .desktopElement, index: 1, skipped: [20])
+        try expect("later blocker retains earlier skip", [tracking, nearBounds, finder],
+                   target: .screen(id: 1), reason: .desktopElement, index: 1, skipped: [20], native: 11)
 
         let dockStrip = window(23, pid: 55, layer: 20,
                                bounds: CGRect(x: 100, y: 800, width: 1000, height: 100),
                                desktop: true, sharing: 0)
         var frozenWindows = [missingSharing, finder, away, dockStrip]
         let diagnosis = report(frozenWindows, decision: try decide(frozenWindows))
-        try check("report distinguishes release build and OS", diagnosis.contains("appVersion=0.2.2 build=6") &&
+        try check("report distinguishes release build and OS", diagnosis.contains("appVersion=0.2.2 build=8") &&
                   diagnosis.contains("system=26.1 (25B78)"))
         try check("report uses supplied capture time and pointer", diagnosis.contains("capturedAt=1970-01-01T00:00:00Z ownPID=99") &&
                   diagnosis.contains("pointer=(150.0,150.0)"))
@@ -101,22 +101,27 @@ struct DiagnosticsTests {
         let unknown = window(24, pid: 1234, layer: 20)
         let unknownReport = report([unknown, finder], decision: try decide([unknown, finder]))
         try check("unknown bundle is explicit", unknownReport.contains("pid=1234 bundle=unknown"))
-        let skipReport = report([tracking, finder], decision: try decide([tracking, finder], transparent: [20]))
-        try check("report explains transparent Dock skip", skipReport.contains("skippedDockWindowIDs=20") &&
+        let skipReport = report([tracking, finder], decision: try decide([tracking, finder], native: 11))
+        try check("report explains native-hit Dock skip", skipReport.contains("skippedDockWindowIDs=20") &&
                   skipReport.contains("decisiveWindowIndex=1") && skipReport.contains("target=window id=11 pid=42 reason=window"))
         let emptyReport = report([], decision: try decide([]))
         try check("empty-area report is unambiguous", emptyReport.contains("reason=noWindow") &&
                   emptyReport.contains("decisiveWindowIndex=none") && emptyReport.contains("relevantWindowCount=0"))
 
-        for alpha in [DockAlphaResult.transparent, .visible, .unavailable] {
-            let probeReport = CaptureDiagnostics.report(
+        for number: Int? in [11, 20, 9999, 0, -1, nil] {
+            let hitReport = CaptureDiagnostics.report(
                 point: point, windows: [tracking, finder], displays: displays,
-                decision: try decide([tracking, finder], transparent: alpha == .transparent ? [20] : []),
-                ownerBundleIDs: [:], ownPID: ownPID, appVersion: "0.2.2", buildVersion: "7", systemVersion: "26.1",
-                dockProbes: [20: DockProbeResult(alpha: alpha, detail: alpha == .unavailable ? "windowUnavailable" : "sampled")])
-            try check("\(alpha) probe outcome is copyable", probeReport.hasPrefix("HoverCapture target diagnosis v2") &&
-                      probeReport.contains("dockProbe id=20 alpha=\(alpha.rawValue) detail="))
+                decision: try decide([tracking, finder], native: number),
+                ownerBundleIDs: [:], ownPID: ownPID, appVersion: "0.2.2", buildVersion: "8", systemVersion: "26.1",
+                nativeHit: CaptureWindowHit(number: number, appKitPoint: CGPoint(x: 150, y: 750)))
+            let matched = number == 11 ? "1" : (number == 20 ? "0" : "none")
+            try check("native hit \(String(describing: number)) is copyable", hitReport.hasPrefix("HoverCapture target diagnosis v3") &&
+                      hitReport.contains("nativeHit windowNumber=\(number.map(String.init) ?? "unavailable")") &&
+                      hitReport.contains("matchedWindowIndex=\(matched)") &&
+                      hitReport.contains("appKitPoint=(150.0,750.0)") && !hitReport.contains("dockProbe"))
         }
+        try check("missing native hit is explicit", diagnosis.contains("nativeHit windowNumber=unavailable") &&
+                  diagnosis.contains("matchedWindowIndex=none"))
 
         let negativePoint = CGPoint(x: -500, y: 150)
         let leftWindow = window(25, bounds: CGRect(x: -600, y: 100, width: 500, height: 400))

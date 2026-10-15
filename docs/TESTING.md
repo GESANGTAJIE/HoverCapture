@@ -4,7 +4,27 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
-## 0.2.2 RC3: Dock pixel probe / RC3：Dock 透明区域检测
+## 0.2.2 RC4: native mouse target / RC4：系统鼠标目标查询
+
+RC3 failed acceptance on the affected **M1 / macOS Tahoe 26.1 (25B78)** Mac. Its build-7 report at `(783.45703125,91.2890625)` showed full-display Dock window 16 ahead of Finder window 6604, with `dockProbe id=16 alpha=visible detail=sampled`; the selected target was Screen. Replaying this metadata and visible probe result reproduced the failure. The separate Finder = Window / Dock = Screen confirmation came from **macOS 15.7.2**, not the affected Tahoe device.
+
+RC4 (build 8) replaces the asynchronous Dock pixel probe with Apple's public [`NSWindow.windowNumber(at:belowWindowWithWindowNumber:)`](https://developer.apple.com/documentation/appkit/nswindow/windownumber(at:belowwindowwithwindownumber:)) query, always using `belowWindowWithWindowNumber: 0`. This queries the frontmost mouse recipient, including other apps, while excluding surfaces that are transparent at that location or ignore mouse events. The point is converted from Quartz to AppKit coordinates using the primary display, in logical points. The query, window list and selection are collected synchronously before the first capture suspension; subsequent pointer movement does not retarget the capture.
+
+The returned positive window number must uniquely match a window in the same list with valid bounds, owner PID and alpha, containing the frozen pointer. Only a full-display, layer-20 Dock surface **ahead of that validated match** may be skipped. Selection then continues in the original order, so menus, HoverCapture's own window and unsupported overlays still block window capture. A Dock hit or missing, zero, unmatched or inconsistent evidence does not bypass Dock. No Dock image is captured for selection, and no additional Accessibility permission is requested.
+
+Diagnostic version 3 records a `nativeHit` line with the returned window number, validated list index and converted AppKit point. It retains capture-time metadata, omits pixels, titles and paths, and is copied only on request; there is no automatic upload.
+
+Local verification on 2026-10-15: **206 checks passed, 0 failed** (46 selection, 70 Tahoe/coordinate validation, 34 diagnostics, 18 language, 25 batch, 11 login, 2 packaging). Universal `arm64` / `x86_64` compilation and strict ad-hoc signature verification passed without compiler warnings. The restricted local environment explicitly skipped the **16 native window-hit checks** and **10 native pasteboard checks**. Release CI requires both through `scripts/test.sh --require-window-hit --require-pasteboard`; its result and package checks are recorded in the release notes. Synthetic hit IDs and successful compilation alone do not establish the affected device's native query result.
+
+**Affected-device acceptance is pending.** Install [RC4 (build 8)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.4) and keep Dock visible. Finder center must produce a target-only `Window-` image, and a visible Dock icon must produce `Screen-`; also repeat over empty desktop and a menu. Holding the pointer still after the shortcut is no longer required. On failure, copy the complete diagnosis and confirm version 3, `appVersion=0.2.2 build=8` and the `nativeHit` line. Homebrew remains at **0.2.1** until affected-device acceptance.
+
+RC3 在受影响的 **M1／Tahoe 26.1（25B78）** 上未通过验收：鼠标位于 Finder 时，构建 7 的日志显示 `dockProbe id=16 alpha=visible detail=sampled`，最终仍选择全屏；回放该元数据与检测结果可复现失败。此前“Finder 为 Window、Dock 为 Screen”的结果仅来自 **macOS 15.7.2**，不能作为 Tahoe 验收结果。
+
+RC4（构建 8）移除异步 Dock 像素检测，改用上述公开系统接口查询实际鼠标目标，查询参数始终为 `belowWindowWithWindowNumber: 0`。坐标按主显示器在 Quartz 与 AppKit 之间转换，不按 Retina 倍率缩放；在首次异步截图之前同步冻结查询、窗口列表和选择结果，按快捷键后无需保持鼠标不动。返回值必须在同一列表中唯一匹配有效窗口且包含鼠标位置；只有排在该匹配之前、全屏且层级 20 的 Dock 窗口允许跳过，其他阻挡规则保留。命中 Dock 或证据无效时仍回退全屏，不额外申请辅助功能权限，也不再生成用于检测的 Dock 图片。
+
+诊断 v3 增加 `nativeHit` 行，包含窗口编号、匹配索引与转换后的坐标；仍不含图片、标题或路径，不自动上传。本地 **206 项通过、0 失败**，双架构构建及严格 ad-hoc 签名校验通过，无编译警告；受限环境明确跳过 **16 项原生窗口命中检查**和 **10 项原生剪贴板检查**，发布 CI 要求两组均执行，结果与安装包检查记入发布说明。**受影响设备仍待验收，Homebrew 保持 0.2.1**；复测需确认 Finder 中央为仅含窗口的 `Window-`、Dock 图标为 `Screen-`，异常时提供构建 8 的完整 v3 诊断。
+
+## 0.2.2 RC3: superseded after failed Tahoe acceptance / RC3：Tahoe 验收失败，已被替代
 
 The RC2 report from the affected M1 / Tahoe 26.1 (25B78) device identified the actual blocker: Dock window 16, layer 20, alpha 1, sharing 1, title present, bounds `(0,0,1440,900)`. At pointer `(691.4140625,242.34765625)`, it precedes Finder window 5206 at `(219,213,920,436)`. RC1 assumed sharing 0 and no title; the real trace disproves that signature. Replaying both the reported relevant-window order and the minimal Dock/Finder pair against RC2 failed: expected Finder, got screen.
 
@@ -14,11 +34,11 @@ The report remains a text-only, manual-copy diagnostic. Version 2 adds `dockProb
 
 Local verification on 2026-10-15: **204 checks passed, 0 failed** (46 selection, 42 native CoreGraphics alpha sampling, 30 Tahoe resolver, 30 diagnostics, 18 language, 25 batch, 11 login, 2 packaging). Universal compilation and strict signature verification passed, with no compiler warnings in the final build. The restricted shell explicitly skipped native pasteboard integration. Tests combine the actual metadata fixture with controlled transparent/visible image samples; they do **not** establish that the affected Tahoe device supplies the expected alpha through ScreenCaptureKit.
 
-Affected-device acceptance is pending: keep Dock visible and pointer still; Finder center must yield a target-only `Window-`, and a visible Dock icon must yield `Screen-`. Repeat over empty desktop and a menu. On failure, copy diagnosis and verify `appVersion=0.2.2 build=7`, then inspect the `dockProbe` lines. Homebrew remains at 0.2.1.
+Subsequent acceptance on 2026-10-15: Finder and Dock behaved as expected on macOS 15.7.2, but the affected Tahoe 26.1 Mac still selected Screen over Finder with `alpha=visible detail=sampled`. **RC3 failed affected-device acceptance and is superseded by RC4.** The checks above remain historical results for the RC3 implementation, not evidence that its pixel assumption held on Tahoe. Homebrew was not promoted.
 
 RC2 真实报告确认了阻挡窗口：Dock、层级 20、全屏边界，但共享状态为 1 且有标题，推翻 RC1 的特征假设。旧选择器回放完整相关列表和精简 Dock/Finder 两窗口时均失败。RC3（构建 7）移除仅凭元数据跳过的规则，只有取得鼠标附近全透明像素证据才继续选择；可见、未知、读取失败或检测到鼠标变化时均保留全屏。检测图片只在内存使用，不保存、不复制，不增加辅助功能权限。
 
-本地 **204 项通过、0 失败**，双架构及严格签名检查通过，最终构建无编译警告；受限终端明确跳过原生剪贴板集成。模拟像素与真实元数据组合通过不等于 Tahoe 实机验收。仍待朋友确认 Finder 中央为 `Window-`、Dock 图标为 `Screen-`；如有异常，提供构建 7 的完整诊断及 `dockProbe` 行。Homebrew 保持 0.2.1。
+RC3 当时的本地 **204 项通过、0 失败**，双架构及严格签名检查通过，最终构建无编译警告；受限终端明确跳过原生剪贴板集成。后续 macOS 15.7.2 的 Finder／Dock 检查通过，但受影响的 Tahoe 26.1 在 Finder 上仍返回 `alpha=visible detail=sampled` 并截取全屏。**RC3 未通过受影响设备验收，已由 RC4 替代**，Homebrew 未升级。以上自动检查保留为历史记录，不代表像素检测假设在 Tahoe 上成立。
 
 API references: Apple's [single-window filter](https://developer.apple.com/documentation/screencapturekit/sccontentfilter/init(desktopindependentwindow:)), [opacity control](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/shouldbeopaque), and [sourceRect limitations](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/sourcerect). Single-window capture ignores sourceRect, so sampling happens after obtaining the full Dock surface.
 
@@ -191,12 +211,13 @@ Run from the repository root on a Mac with Apple's command-line build tools:
 ./scripts/package.sh
 ```
 
-- The test script exercises pure target-selection logic. These tests do not grant Screen Recording permission and cannot validate captured pixels.
+- The test script exercises selection, coordinate conversion, diagnostics, language, batching, login settings and packaging. Native integration checks exercise the window-hit API with test-owned windows and the pasteboard. No test grants Screen Recording permission or validates real screenshot pixels.
+- In restricted environments, unavailable native GUI/pasteboard checks are explicitly skipped. Release CI runs `./scripts/test.sh --require-window-hit --require-pasteboard` so those checks are mandatory; a functional test failure is not a skip.
 - The build script compiles and assembles a universal app for the minimum supported macOS version.
 - The packaging script creates the DMG and ZIP for installation testing.
 - Review command exit codes and complete output. Report a failed compilation or packaging step rather than continuing as if it succeeded.
 
-自动测试主要验证目标选择逻辑，不申请录屏权限，也不能确认真实截图是否正确。构建验证编译与应用打包，安装包脚本验证 DMG/ZIP 生成。检查每一步退出状态和完整错误，不要忽略失败。
+自动测试验证选择、坐标转换、诊断、语言、批次、登录设置与打包；原生集成检查使用测试工具自建窗口验证命中接口，并验证剪贴板。测试不申请录屏权限，也不能确认真实截图是否正确。受限环境中不可用的原生检查会明确跳过；发布 CI 使用 `--require-window-hit --require-pasteboard` 要求两组执行，功能测试失败不能记为跳过。构建验证编译与应用打包，安装包脚本验证 DMG/ZIP 生成。检查每一步退出状态和完整错误，不要忽略失败。
 
 If the environment cannot create disk images, run `./scripts/package.sh --zip-only` to generate the universal ZIP and its checksum file. Record that no DMG was produced, skip the DMG verification command below, and verify the ZIP instead. This packaging mode does not change the app's signing or permission requirements.
 

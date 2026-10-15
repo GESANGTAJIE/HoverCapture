@@ -6,14 +6,14 @@ enum CaptureDiagnostics {
     static func report(point: CGPoint, windows: [CaptureWindow], displays: [CaptureDisplay],
                        decision: CaptureDecision, ownerBundleIDs: [Int32: String], ownPID: Int32,
                        appVersion: String, buildVersion: String, systemVersion: String,
-                       date: Date = Date(), dockProbes: [CGWindowID: DockProbeResult] = [:]) -> String {
+                       date: Date = Date(), nativeHit: CaptureWindowHit? = nil) -> String {
         let target: String
         switch decision.target {
         case let .window(id, ownerPID): target = "window id=\(id) pid=\(ownerPID)"
         case let .screen(id): target = "screen id=\(id)"
         }
         var lines = [
-            "HoverCapture target diagnosis v2",
+            "HoverCapture target diagnosis v3",
             "appVersion=\(appVersion) build=\(buildVersion)",
             "system=\(systemVersion)",
             "capturedAt=\(ISO8601DateFormatter().string(from: date)) ownPID=\(ownPID)",
@@ -26,11 +26,10 @@ enum CaptureDiagnostics {
         for display in displays {
             lines.append("display id=\(display.id) bounds=\(rect(display.bounds))")
         }
-        for id in dockProbes.keys.sorted() {
-            if let probe = dockProbes[id] {
-                lines.append("dockProbe id=\(id) alpha=\(probe.alpha.rawValue) detail=\(probe.detail)")
-            }
-        }
+        let hitIndex = WindowHitTest.matchedIndex(for: nativeHit?.number, at: point, windows: windows)
+        let appKitPoint = nativeHit?.appKitPoint.map { "(\($0.x),\($0.y))" } ?? "unavailable"
+        lines.append("nativeHit windowNumber=\(nativeHit?.number.map(String.init) ?? "unavailable") " +
+                     "matchedWindowIndex=\(hitIndex.map(String.init) ?? "none") appKitPoint=\(appKitPoint)")
         // Include windows behind the blocker plus Dock surfaces away from the pointer.
         // Original indices preserve WindowServer order. Other unrelated apps are omitted.
         let relevant = windows.enumerated().filter { index, window in

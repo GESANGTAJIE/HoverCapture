@@ -10,8 +10,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Logic and native clipboard tests
-        run: bash scripts/test.sh --require-pasteboard
+      - name: Logic, native window hit and clipboard tests
+        run: bash scripts/test.sh --require-pasteboard --require-window-hit
       - name: Build and package universal application
         run: bash scripts/package.sh
       - uses: actions/upload-artifact@v4

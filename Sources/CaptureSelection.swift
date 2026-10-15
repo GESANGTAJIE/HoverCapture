@@ -43,28 +43,30 @@ enum CaptureSelection {
     // visible surface: a menu must not expose a window behind it as the target.
     static func target(at point: CGPoint, windows: [CaptureWindow],
                        displays: [CaptureDisplay], ownPID: Int32,
-                       transparentDockWindowIDs: Set<CGWindowID> = []) throws -> CaptureTarget {
+                       nativeWindowNumber: Int? = nil) throws -> CaptureTarget {
         try decision(at: point, windows: windows, displays: displays, ownPID: ownPID,
-                     transparentDockWindowIDs: transparentDockWindowIDs).target
+                     nativeWindowNumber: nativeWindowNumber).target
     }
 
     static func decision(at point: CGPoint, windows: [CaptureWindow],
                          displays: [CaptureDisplay], ownPID: Int32,
-                         transparentDockWindowIDs: Set<CGWindowID> = []) throws -> CaptureDecision {
+                         nativeWindowNumber: Int? = nil) throws -> CaptureDecision {
         guard point.x.isFinite, point.y.isFinite else {
             throw CaptureSelectionError.invalidPointer
         }
         var skippedDockWindowIDs: [CGWindowID] = []
+        let nativeIndex = WindowHitTest.matchedIndex(for: nativeWindowNumber, at: point, windows: windows)
         for (index, window) in windows.enumerated() {
             guard window.alpha.isFinite, valid(window.bounds) else {
                 throw CaptureSelectionError.invalidWindow
             }
             guard window.layer >= 0, window.alpha > 0,
                   contains(window.bounds, point) else { continue }
-            // A full-display Dock window can contain both transparent space and
-            // visible icons. Sharing state and title presence cannot tell them apart.
+            // Dock's full-display surface is not its mouse-hit region. Only the
+            // system's validated hit on a later surface permits bypassing it.
+            // Keep scanning in order so other visible blockers still take effect.
             if isFullDisplayDock(window, displays: displays),
-               transparentDockWindowIDs.contains(window.id) {
+               let nativeIndex, index < nativeIndex {
                 skippedDockWindowIDs.append(window.id)
                 continue
             }
