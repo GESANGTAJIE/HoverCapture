@@ -42,12 +42,15 @@ enum CaptureSelection {
     // WindowServer supplies these windows from front to back. Stop at the first
     // visible surface: a menu must not expose a window behind it as the target.
     static func target(at point: CGPoint, windows: [CaptureWindow],
-                       displays: [CaptureDisplay], ownPID: Int32) throws -> CaptureTarget {
-        try decision(at: point, windows: windows, displays: displays, ownPID: ownPID).target
+                       displays: [CaptureDisplay], ownPID: Int32,
+                       transparentDockWindowIDs: Set<CGWindowID> = []) throws -> CaptureTarget {
+        try decision(at: point, windows: windows, displays: displays, ownPID: ownPID,
+                     transparentDockWindowIDs: transparentDockWindowIDs).target
     }
 
     static func decision(at point: CGPoint, windows: [CaptureWindow],
-                         displays: [CaptureDisplay], ownPID: Int32) throws -> CaptureDecision {
+                         displays: [CaptureDisplay], ownPID: Int32,
+                         transparentDockWindowIDs: Set<CGWindowID> = []) throws -> CaptureDecision {
         guard point.x.isFinite, point.y.isFinite else {
             throw CaptureSelectionError.invalidPointer
         }
@@ -58,12 +61,10 @@ enum CaptureSelection {
             }
             guard window.layer >= 0, window.alpha > 0,
                   contains(window.bounds, point) else { continue }
-            // Tahoe's visible Dock can add an invisible full-display tracking
-            // surface. Match its complete signature, not all Dock/overlay windows;
-            // the visible Dock strip and menus must still block windows behind them.
-            if window.isDesktopElement, window.layer == 20, window.sharingState == 0,
-               !window.hasTitle,
-               displays.contains(where: { $0.id != 0 && $0.bounds == window.bounds }) {
+            // A full-display Dock window can contain both transparent space and
+            // visible icons. Sharing state and title presence cannot tell them apart.
+            if isFullDisplayDock(window, displays: displays),
+               transparentDockWindowIDs.contains(window.id) {
                 skippedDockWindowIDs.append(window.id)
                 continue
             }
@@ -82,6 +83,12 @@ enum CaptureSelection {
         }
         return CaptureDecision(target: try screen(at: point, displays: displays), reason: .noWindow,
                                windowIndex: nil, skippedDockWindowIDs: skippedDockWindowIDs)
+    }
+
+    static func isFullDisplayDock(_ window: CaptureWindow, displays: [CaptureDisplay]) -> Bool {
+        window.id != 0 && window.ownerPID > 0 && window.isDesktopElement && window.layer == 20 &&
+            displays.contains { $0.id != 0 && valid($0.bounds) && $0.bounds.width > 0 &&
+                $0.bounds.height > 0 && $0.bounds == window.bounds }
     }
 
     private static func screen(at point: CGPoint, displays: [CaptureDisplay]) throws -> CaptureTarget {

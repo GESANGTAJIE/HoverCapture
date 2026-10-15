@@ -7,7 +7,15 @@ xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
     -o "$ROOT/build/selection-tests"
 "$ROOT/build/selection-tests"
 xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
+    "$ROOT/Sources/DockAlpha.swift" "$ROOT/Tests/DockAlphaTests.swift" -o "$ROOT/build/dock-alpha-tests"
+"$ROOT/build/dock-alpha-tests"
+xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
+    "$ROOT/Sources/CaptureSelection.swift" "$ROOT/Sources/DockAlpha.swift" \
+    "$ROOT/Sources/CaptureResolver.swift" "$ROOT/Tests/TahoeDockTests.swift" -o "$ROOT/build/tahoe-dock-tests"
+"$ROOT/build/tahoe-dock-tests"
+xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
     "$ROOT/Sources/CaptureSelection.swift" "$ROOT/Sources/CaptureDiagnostics.swift" \
+    "$ROOT/Sources/DockAlpha.swift" "$ROOT/Sources/CaptureResolver.swift" \
     "$ROOT/Tests/DiagnosticsTests.swift" -o "$ROOT/build/diagnostics-tests"
 "$ROOT/build/diagnostics-tests"
 xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \

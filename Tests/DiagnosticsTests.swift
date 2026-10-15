@@ -21,13 +21,14 @@ struct DiagnosticsTests {
             CaptureWindow(id: id, ownerPID: pid, bounds: bounds, layer: layer, alpha: 1,
                           isDesktopElement: desktop, sharingState: sharing, hasTitle: title)
         }
-        func decide(_ windows: [CaptureWindow], at location: CGPoint? = nil) throws -> CaptureDecision {
+        func decide(_ windows: [CaptureWindow], at location: CGPoint? = nil,
+                    transparent: Set<CGWindowID> = []) throws -> CaptureDecision {
             try CaptureSelection.decision(at: location ?? point, windows: windows,
-                                          displays: displays, ownPID: ownPID)
+                                          displays: displays, ownPID: ownPID, transparentDockWindowIDs: transparent)
         }
         func expect(_ name: String, _ windows: [CaptureWindow], target: CaptureTarget,
                     reason: CaptureSelectionReason, index: Int?, skipped: [CGWindowID] = []) throws {
-            let actual = try decide(windows)
+            let actual = try decide(windows, transparent: Set(skipped))
             try check(name, actual == CaptureDecision(target: target, reason: reason,
                                                      windowIndex: index, skippedDockWindowIDs: skipped))
         }
@@ -55,7 +56,7 @@ struct DiagnosticsTests {
                    target: .screen(id: 1), reason: .noWindow, index: nil)
 
         let tracking = window(20, pid: 55, layer: 20, bounds: main.bounds, desktop: true, sharing: 0)
-        try expect("exact Dock tracking signature reports skip", [tracking, finder],
+        try expect("transparent Dock probe reports skip", [tracking, finder],
                    target: .window(id: 11, ownerPID: 42), reason: .window, index: 1, skipped: [20])
         try expect("tracking-only desktop preserves skip", [tracking],
                    target: .screen(id: 1), reason: .noWindow, index: nil, skipped: [20])
@@ -100,12 +101,22 @@ struct DiagnosticsTests {
         let unknown = window(24, pid: 1234, layer: 20)
         let unknownReport = report([unknown, finder], decision: try decide([unknown, finder]))
         try check("unknown bundle is explicit", unknownReport.contains("pid=1234 bundle=unknown"))
-        let skipReport = report([tracking, finder], decision: try decide([tracking, finder]))
-        try check("report explains exact Dock skip", skipReport.contains("skippedDockWindowIDs=20") &&
+        let skipReport = report([tracking, finder], decision: try decide([tracking, finder], transparent: [20]))
+        try check("report explains transparent Dock skip", skipReport.contains("skippedDockWindowIDs=20") &&
                   skipReport.contains("decisiveWindowIndex=1") && skipReport.contains("target=window id=11 pid=42 reason=window"))
         let emptyReport = report([], decision: try decide([]))
         try check("empty-area report is unambiguous", emptyReport.contains("reason=noWindow") &&
                   emptyReport.contains("decisiveWindowIndex=none") && emptyReport.contains("relevantWindowCount=0"))
+
+        for alpha in [DockAlphaResult.transparent, .visible, .unavailable] {
+            let probeReport = CaptureDiagnostics.report(
+                point: point, windows: [tracking, finder], displays: displays,
+                decision: try decide([tracking, finder], transparent: alpha == .transparent ? [20] : []),
+                ownerBundleIDs: [:], ownPID: ownPID, appVersion: "0.2.2", buildVersion: "7", systemVersion: "26.1",
+                dockProbes: [20: DockProbeResult(alpha: alpha, detail: alpha == .unavailable ? "windowUnavailable" : "sampled")])
+            try check("\(alpha) probe outcome is copyable", probeReport.hasPrefix("HoverCapture target diagnosis v2") &&
+                      probeReport.contains("dockProbe id=20 alpha=\(alpha.rawValue) detail="))
+        }
 
         let negativePoint = CGPoint(x: -500, y: 150)
         let leftWindow = window(25, bounds: CGRect(x: -600, y: 100, width: 500, height: 400))

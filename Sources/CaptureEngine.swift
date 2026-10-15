@@ -1,5 +1,6 @@
 import AppKit
 import ScreenCaptureKit
+import CoreVideo
 
 struct CaptureResult {
     let fileURL: URL?
@@ -23,7 +24,7 @@ final class CaptureEngine {
         }
         // Freeze pointer, window order and display IDs before the first await.
         // Moving the pointer while ScreenCaptureKit responds cannot retarget it.
-        let target = try snapshotTarget()
+        let snapshot = try snapshotTarget()
         let content: SCShareableContent
         do {
             content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -31,6 +32,20 @@ final class CaptureEngine {
             throw failure("无法读取可截图内容：\(error.localizedDescription)",
                           "Could not read shareable content: \(error.localizedDescription)")
         }
+
+        let resolution: CaptureResolution
+        do {
+            resolution = try await CaptureResolver.resolve(
+                at: snapshot.point, windows: snapshot.windows, displays: snapshot.displays, ownPID: snapshot.ownPID
+            ) { window in
+                await self.probeDock(window, at: snapshot.point, content: content)
+            }
+        } catch {
+            throw failure("无法确定有效的截图目标（\(error)），已取消截图。",
+                          "Could not determine a valid capture target (\(error)). Capture was canceled.")
+        }
+        recordDiagnostic(snapshot, decision: resolution.decision, probes: resolution.dockProbes)
+        let target = resolution.decision.target
 
         let filter: SCContentFilter
         let kind: String
@@ -83,7 +98,7 @@ final class CaptureEngine {
         return try deliver(image, directory: directory, kind: kind)
     }
 
-    private func snapshotTarget() throws -> CaptureTarget {
+    private func snapshotTarget() throws -> CaptureSnapshot {
         guard let point = CGEvent(source: nil)?.location else {
             throw failure("无法读取鼠标位置。", "Could not read the pointer position.")
         }
@@ -132,16 +147,77 @@ final class CaptureEngine {
             let ownPID = ProcessInfo.processInfo.processIdentifier
             let decision = try CaptureSelection.decision(at: point, windows: windows, displays: displays,
                                                          ownPID: ownPID)
-            lastDiagnostic = CaptureDiagnostics.report(
-                point: point, windows: windows, displays: displays, decision: decision,
-                ownerBundleIDs: ownerBundleIDs, ownPID: ownPID,
-                appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
-                buildVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown",
-                systemVersion: ProcessInfo.processInfo.operatingSystemVersionString)
-            return decision.target
+            let snapshot = CaptureSnapshot(point: point, windows: windows, displays: displays,
+                                           ownerBundleIDs: ownerBundleIDs, ownPID: ownPID, date: Date())
+            recordDiagnostic(snapshot, decision: decision)
+            return snapshot
         } catch {
             throw failure("无法确定有效的截图目标（\(error)），已取消截图。",
                           "Could not determine a valid capture target (\(error)). Capture was canceled.")
+        }
+    }
+
+    private func recordDiagnostic(_ snapshot: CaptureSnapshot, decision: CaptureDecision,
+                                  probes: [CGWindowID: DockProbeResult] = [:]) {
+        lastDiagnostic = CaptureDiagnostics.report(
+            point: snapshot.point, windows: snapshot.windows, displays: snapshot.displays, decision: decision,
+            ownerBundleIDs: snapshot.ownerBundleIDs, ownPID: snapshot.ownPID,
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
+            buildVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown",
+            systemVersion: ProcessInfo.processInfo.operatingSystemVersionString, date: snapshot.date,
+            dockProbes: probes)
+    }
+
+    private func probeDock(_ frozen: CaptureWindow, at point: CGPoint,
+                           content: SCShareableContent) async -> DockProbeResult {
+        // Moving away can hide or shrink Dock icons before the asynchronous image
+        // arrives. Compare only; never retarget the capture to the new pointer.
+        guard CGEvent(source: nil)?.location == point else {
+            return DockProbeResult(alpha: .unavailable, detail: "pointerMovedBeforeProbe")
+        }
+        guard let window = content.windows.first(where: {
+            $0.windowID == frozen.id && $0.owningApplication?.processID == frozen.ownerPID && $0.isOnScreen
+        }) else { return DockProbeResult(alpha: .unavailable, detail: "windowUnavailable") }
+        guard window.frame == frozen.bounds else {
+            return DockProbeResult(alpha: .unavailable, detail: "windowMoved")
+        }
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let scale = CGFloat(filter.pointPixelScale)
+        let width = ceil(frozen.bounds.width * scale)
+        let height = ceil(frozen.bounds.height * scale)
+        guard filter.contentRect.size == frozen.bounds.size,
+              scale.isFinite, scale > 0, width.isFinite, height.isFinite,
+              width > 0, height > 0, width < CGFloat(Int.max), height < CGFloat(Int.max) else {
+            return DockProbeResult(alpha: .unavailable, detail: "invalidGeometry")
+        }
+        let configuration = SCStreamConfiguration()
+        configuration.width = Int(width)
+        configuration.height = Int(height)
+        configuration.captureResolution = .best
+        configuration.showsCursor = false
+        configuration.capturesAudio = false
+        configuration.shouldBeOpaque = false
+        configuration.pixelFormat = kCVPixelFormatType_32BGRA
+        // SCStreamConfiguration's default background is clear.
+        configuration.ignoreShadowsSingleWindow = true
+        configuration.ignoreGlobalClipSingleWindow = true
+        configuration.includeChildWindows = false
+        // Single-window sourceRect cropping is not supported. Capture only this
+        // Dock surface, then inspect a tiny pixel neighborhood without saving it.
+        do {
+            let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+            guard CGEvent(source: nil)?.location == point else {
+                return DockProbeResult(alpha: .unavailable, detail: "pointerMovedDuringProbe")
+            }
+            guard image.width == Int(width), image.height == Int(height) else {
+                return DockProbeResult(alpha: .unavailable, detail: "imageSizeMismatch")
+            }
+            let alpha = DockAlpha.sample(image, at: point, in: frozen.bounds)
+            return DockProbeResult(alpha: alpha, detail: alpha == .unavailable ? "unsupportedImage" : "sampled")
+        } catch {
+            let error = error as NSError
+            NSLog("HoverCapture Dock probe failed for window %u: %@ (%ld)", frozen.id, error.domain, error.code)
+            return DockProbeResult(alpha: .unavailable, detail: "captureFailed(\(error.domain):\(error.code))")
         }
     }
 
@@ -191,6 +267,15 @@ final class CaptureEngine {
     private func failure(_ chinese: String, _ english: String) -> CaptureEngineError {
         CaptureEngineError(message: captureText(chinese, english))
     }
+}
+
+private struct CaptureSnapshot {
+    let point: CGPoint
+    let windows: [CaptureWindow]
+    let displays: [CaptureDisplay]
+    let ownerBundleIDs: [Int32: String]
+    let ownPID: Int32
+    let date: Date
 }
 
 private func captureText(_ chinese: String, _ english: String) -> String {

@@ -4,6 +4,24 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
+## 0.2.2 RC3: Dock pixel probe / RC3：Dock 透明区域检测
+
+The RC2 report from the affected M1 / Tahoe 26.1 (25B78) device identified the actual blocker: Dock window 16, layer 20, alpha 1, sharing 1, title present, bounds `(0,0,1440,900)`. At pointer `(691.4140625,242.34765625)`, it precedes Finder window 5206 at `(219,213,920,436)`. RC1 assumed sharing 0 and no title; the real trace disproves that signature. Replaying both the reported relevant-window order and the minimal Dock/Finder pair against RC2 failed: expected Finder, got screen.
+
+RC3 (build 7) removes metadata-only skipping. Only a decisive full-display, layer-20 Dock surface is probed with a desktop-independent ScreenCaptureKit screenshot, explicit BGRA and `shouldBeOpaque = false`. A small clipped neighborhood at the frozen pointer must contain only zero-alpha pixels before selection may continue. Visible, unknown, unavailable or changed evidence retains Screen fallback. The temporary Dock image is not saved or copied. Window ID, owner PID, bounds, content dimensions and image dimensions must match; pointer changes detected before/after the async probe also retain Screen. Menus, Mission Control, ordinary windows and other overlays are not transparency-probed.
+
+The report remains a text-only, manual-copy diagnostic. Version 2 adds `dockProbe` outcome/detail lines, retains capture-time metadata and never uploads automatically. Pointer checks compare with the frozen position; they do not retarget to a later position.
+
+Local verification on 2026-10-15: **204 checks passed, 0 failed** (46 selection, 42 native CoreGraphics alpha sampling, 30 Tahoe resolver, 30 diagnostics, 18 language, 25 batch, 11 login, 2 packaging). Universal compilation and strict signature verification passed, with no compiler warnings in the final build. The restricted shell explicitly skipped native pasteboard integration. Tests combine the actual metadata fixture with controlled transparent/visible image samples; they do **not** establish that the affected Tahoe device supplies the expected alpha through ScreenCaptureKit.
+
+Affected-device acceptance is pending: keep Dock visible and pointer still; Finder center must yield a target-only `Window-`, and a visible Dock icon must yield `Screen-`. Repeat over empty desktop and a menu. On failure, copy diagnosis and verify `appVersion=0.2.2 build=7`, then inspect the `dockProbe` lines. Homebrew remains at 0.2.1.
+
+RC2 真实报告确认了阻挡窗口：Dock、层级 20、全屏边界，但共享状态为 1 且有标题，推翻 RC1 的特征假设。旧选择器回放完整相关列表和精简 Dock/Finder 两窗口时均失败。RC3（构建 7）移除仅凭元数据跳过的规则，只有取得鼠标附近全透明像素证据才继续选择；可见、未知、读取失败或检测到鼠标变化时均保留全屏。检测图片只在内存使用，不保存、不复制，不增加辅助功能权限。
+
+本地 **204 项通过、0 失败**，双架构及严格签名检查通过，最终构建无编译警告；受限终端明确跳过原生剪贴板集成。模拟像素与真实元数据组合通过不等于 Tahoe 实机验收。仍待朋友确认 Finder 中央为 `Window-`、Dock 图标为 `Screen-`；如有异常，提供构建 7 的完整诊断及 `dockProbe` 行。Homebrew 保持 0.2.1。
+
+API references: Apple's [single-window filter](https://developer.apple.com/documentation/screencapturekit/sccontentfilter/init(desktopindependentwindow:)), [opacity control](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/shouldbeopaque), and [sourceRect limitations](https://developer.apple.com/documentation/screencapturekit/scstreamconfiguration/sourcerect). Single-window capture ignores sourceRect, so sampling happens after obtaining the full Dock surface.
+
 ## 0.2.2 RC2 diagnostics / RC2 诊断
 
 The affected M1/Tahoe 26.1 user tested RC1 and reported that hovering an ordinary window still captures the screen. The synthetic RC1 regression passing did not establish the actual device's window signature. **RC1 acceptance failed.** RC2 (build 6) leaves selection behavior unchanged and adds an explicit Copy Last Capture Diagnosis menu action.

@@ -8,11 +8,13 @@ Point at a Mac window. Press one shortcut. Get a screenshot of that window, save
 
 HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon, a browser extension, or a background command-line service.
 
-## 0.2.2 diagnostic candidate — Tahoe Dock investigation
+## 0.2.2 RC3 — Tahoe Dock transparency candidate
 
-[Download RC2 (build 6)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.2). **RC1 did not resolve the affected user's full-screen selection. RC2 adds diagnostics; it does not claim another fix.** Its selection rules are unchanged from RC1.
+[Download RC3 (build 7)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.3). **Affected-device acceptance is still pending. Homebrew remains on 0.2.1.** RC2 diagnostics confirmed that a full-display Dock window was being selected ahead of Finder; its title/sharing metadata differed from RC1's assumptions.
 
-On an M1 Mac running Tahoe 26.1, a user confirmed that hiding the Dock restores window selection. Homebrew remains on 0.2.1. To collect evidence with RC2: keep Dock visible, hover an ordinary Finder window, press the capture shortcut, then select **Copy Last Capture Diagnosis** from the HoverCapture menu and paste the text into your bug report. The diagnosis is frozen at the capture, retained only in memory, and contains versions, application identifiers, pointer/window coordinates, and selection reasons. It excludes screenshot pixels, window titles and document paths, and is never uploaded automatically. Copying replaces clipboard content; Copy Batch restores retained screenshots. No report is available before a capture target has been determined.
+RC3 inspects transparency near the pointer only when a full-display, layer-20 Dock surface blocks selection. Transparent pixels allow selection to continue; visible Dock content, unavailable evidence and pointer movement during the check retain screen fallback. This uses existing Screen Recording access, without Accessibility permission. The temporary Dock image is neither saved nor copied. Ordinary windows, menus and other overlays retain their selection rules.
+
+To verify: keep Dock visible and hold the pointer still while capturing. Finder's center should produce `Window-`; a visible Dock icon should produce `Screen-`. If either fails, select **Copy Last Capture Diagnosis** and share its text (`appVersion=0.2.2 build=7`, including `dockProbe` lines). The report includes application identifiers, coordinates and probe outcomes, but no screenshot pixels, window titles or document paths. It remains in memory, is never uploaded automatically, and copying it replaces clipboard content. Copy Batch restores retained screenshots.
 
 Temporary workaround: enable System Settings → Desktop & Dock → Automatically hide and show the Dock, wait until it hides, then capture over an ordinary window. No permission reset is needed for this workaround.
 

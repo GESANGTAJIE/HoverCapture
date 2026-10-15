@@ -6,14 +6,14 @@ enum CaptureDiagnostics {
     static func report(point: CGPoint, windows: [CaptureWindow], displays: [CaptureDisplay],
                        decision: CaptureDecision, ownerBundleIDs: [Int32: String], ownPID: Int32,
                        appVersion: String, buildVersion: String, systemVersion: String,
-                       date: Date = Date()) -> String {
+                       date: Date = Date(), dockProbes: [CGWindowID: DockProbeResult] = [:]) -> String {
         let target: String
         switch decision.target {
         case let .window(id, ownerPID): target = "window id=\(id) pid=\(ownerPID)"
         case let .screen(id): target = "screen id=\(id)"
         }
         var lines = [
-            "HoverCapture target diagnosis v1",
+            "HoverCapture target diagnosis v2",
             "appVersion=\(appVersion) build=\(buildVersion)",
             "system=\(systemVersion)",
             "capturedAt=\(ISO8601DateFormatter().string(from: date)) ownPID=\(ownPID)",
@@ -25,6 +25,11 @@ enum CaptureDiagnostics {
         ]
         for display in displays {
             lines.append("display id=\(display.id) bounds=\(rect(display.bounds))")
+        }
+        for id in dockProbes.keys.sorted() {
+            if let probe = dockProbes[id] {
+                lines.append("dockProbe id=\(id) alpha=\(probe.alpha.rawValue) detail=\(probe.detail)")
+            }
         }
         // Include windows behind the blocker plus Dock surfaces away from the pointer.
         // Original indices preserve WindowServer order. Other unrelated apps are omitted.
