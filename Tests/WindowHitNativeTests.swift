@@ -58,8 +58,12 @@ struct WindowHitNativeTests {
         let backID = back.windowNumber
         let frontID = front.windowNumber
         var checks = 0
+        var failures: [String] = []
         func check(_ name: String, _ condition: Bool, detail: String = "") throws {
-            guard condition else { throw TestFailure(message: "\(name): \(detail)") }
+            guard condition else {
+                failures.append("\(name): \(detail)")
+                return
+            }
             checks += 1
         }
         func expectHit(_ name: String, at point: NSPoint, expected: Int, below: Int = 0) throws {
@@ -120,6 +124,9 @@ struct WindowHitNativeTests {
         let afterClose = NSWindow.windowNumber(at: point, belowWindowWithWindowNumber: 0)
         try check("closed owned windows no longer hit", afterClose != backID && afterClose != frontID,
                   detail: "closed ID still returned: \(afterClose)")
+        guard failures.isEmpty else {
+            throw TestFailure(message: "\(checks) passed, \(failures.count) failed:\n" + failures.joined(separator: "\n"))
+        }
         print("\(checks) native window hit checks passed")
     }
 
