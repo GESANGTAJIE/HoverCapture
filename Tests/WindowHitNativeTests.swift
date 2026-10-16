@@ -111,11 +111,33 @@ struct WindowHitNativeTests {
         let view = HalfOpaqueView(frame: NSRect(origin: .zero, size: front.frame.size))
         front.contentView = view
         view.needsDisplay = true
-        front.displayIfNeeded()
+        front.display()
+        if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            try check("fixture draws an opaque left half",
+                      bitmap.colorAt(x: bitmap.pixelsWide / 4, y: bitmap.pixelsHigh / 2)?.alphaComponent == 1)
+            try check("fixture draws a transparent right half",
+                      bitmap.colorAt(x: 3 * bitmap.pixelsWide / 4, y: bitmap.pixelsHigh / 2)?.alphaComponent == 0)
+        } else {
+            try check("fixture bitmap is available", false)
+        }
         let solidPoint = NSPoint(x: front.frame.minX + front.frame.width / 4, y: front.frame.midY)
         let clearPoint = NSPoint(x: front.frame.minX + 3 * front.frame.width / 4, y: front.frame.midY)
         try expectHit("drawn region of nonopaque window receives hit", at: solidPoint, expected: frontID)
         try expectHit("clear region falls through to underlying window", at: clearPoint, expected: backID)
+
+        // Also test a window configured as nonopaque before it ever enters the
+        // WindowServer, independently of the opaque-to-clear mutation above.
+        front.orderOut(nil)
+        let fresh = makeWindow(frame: front.frame, color: .clear)
+        defer { fresh.close() }
+        fresh.isOpaque = false
+        fresh.contentView = HalfOpaqueView(frame: NSRect(origin: .zero, size: fresh.frame.size))
+        fresh.orderFrontRegardless()
+        fresh.display()
+        try expectHit("fresh nonopaque drawn region receives hit", at: solidPoint, expected: fresh.windowNumber)
+        try expectHit("fresh nonopaque clear region falls through", at: clearPoint, expected: backID)
+        fresh.close()
 
         front.close()
         try expectHit("closed front window is excluded", at: point, expected: backID)
@@ -145,7 +167,15 @@ struct WindowHitNativeTests {
     @MainActor
     private static func settle(_ app: NSApplication) {
         app.updateWindows()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        // AppKit defers display transactions until its event loop runs. A plain
+        // Foundation run loop does not perform NSApplication's event processing.
+        let deadline = Date().addingTimeInterval(0.05)
+        while let event = app.nextEvent(matching: .any, until: deadline,
+                                        inMode: .default, dequeue: true) {
+            app.sendEvent(event)
+            if Date() >= deadline { break }
+        }
+        app.updateWindows()
     }
 }
 

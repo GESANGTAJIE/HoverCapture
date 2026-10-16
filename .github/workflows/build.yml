@@ -6,7 +6,17 @@ on:
 permissions:
   contents: read
 jobs:
+  native-tahoe:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native window hit tests on Tahoe
+        run: |
+          mkdir -p build/module-cache
+          xcrun swiftc -swift-version 5 -parse-as-library -module-cache-path build/module-cache -framework AppKit Tests/WindowHitNativeTests.swift -o build/window-hit-native-tests
+          build/window-hit-native-tests
   macos:
+    needs: native-tahoe
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
