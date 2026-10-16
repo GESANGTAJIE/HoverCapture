@@ -78,6 +78,67 @@ struct WindowHitNativeTests {
             try check(name, actual == expected,
                       detail: "point=\(point), below=\(below), expected=\(expected), actual=\(actual)")
         }
+        func expectSelected(_ name: String, at point: NSPoint, window expectedWindow: Int?,
+                            reason expectedReason: CaptureSelectionReason = .window,
+                            ownPID: Int32 = Int32.max, overlay: Int? = nil) throws {
+            settle(app)
+            let primaryID = CGMainDisplayID()
+            guard let primaryScreen = NSScreen.screens.first(where: {
+                ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == primaryID
+            }) else { throw TestFailure(message: "\(name): primary AppKit screen unavailable") }
+            let primaryBounds = CGDisplayBounds(primaryID)
+            let quartzPoint = CGPoint(x: primaryBounds.minX + point.x - primaryScreen.frame.minX,
+                                      y: primaryBounds.minY + primaryScreen.frame.maxY - point.y)
+            guard let queryPoint = WindowHitTest.appKitPoint(from: quartzPoint,
+                                                            primaryDisplayBounds: primaryBounds,
+                                                            primaryScreenFrame: primaryScreen.frame),
+                  let entries = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
+                throw TestFailure(message: "\(name): coordinate conversion or CGWindow list unavailable")
+            }
+            // Preserve the real WindowServer order, layers, bounds, alpha and IDs.
+            // Only our own fixture metadata is retained; no screenshot is taken.
+            let windows = try entries.filter {
+                ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == getpid()
+            }.map { entry -> CaptureWindow in
+                guard let id = entry[kCGWindowNumber as String] as? NSNumber,
+                      let layer = entry[kCGWindowLayer as String] as? NSNumber,
+                      let alpha = entry[kCGWindowAlpha as String] as? NSNumber,
+                      let dictionary = entry[kCGWindowBounds as String] as? NSDictionary,
+                      let bounds = CGRect(dictionaryRepresentation: dictionary),
+                      bounds.minX.isFinite, bounds.minY.isFinite,
+                      bounds.width.isFinite, bounds.height.isFinite,
+                      bounds.width > 0, bounds.height > 0 else {
+                    throw TestFailure(message: "\(name): malformed owned CGWindow metadata")
+                }
+                return CaptureWindow(id: id.uint32Value, ownerPID: getpid(), bounds: bounds,
+                                     layer: layer.intValue, alpha: alpha.doubleValue)
+            }
+            let displays = NSScreen.screens.compactMap { screen -> CaptureDisplay? in
+                guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else {
+                    return nil
+                }
+                return CaptureDisplay(id: id, bounds: CGDisplayBounds(id))
+            }
+            guard let display = displays.first(where: { $0.bounds.contains(quartzPoint) }) else {
+                throw TestFailure(message: "\(name): no display contains converted point \(quartzPoint)")
+            }
+            let nativeID = NSWindow.windowNumber(at: queryPoint, belowWindowWithWindowNumber: 0)
+            let decision = try CaptureSelection.decision(at: quartzPoint, windows: windows, displays: displays,
+                                                         ownPID: ownPID, nativeWindowNumber: nativeID)
+            let expected = expectedWindow.map { CaptureTarget.window(id: CGWindowID($0), ownerPID: getpid()) }
+                ?? .screen(id: display.id)
+            let nativeIndex = windows.firstIndex { Int($0.id) == nativeID }
+            let overlayIndex = overlay.flatMap { id in windows.firstIndex { Int($0.id) == id } }
+            let overlayPrecedesHit: Bool
+            if let overlayIndex, let nativeIndex {
+                overlayPrecedesHit = overlayIndex < nativeIndex
+            } else {
+                overlayPrecedesHit = overlay == nil
+            }
+            try check(name, decision.source == .nativeHit && decision.windowIndex == nativeIndex && nativeIndex != nil &&
+                      decision.target == expected && decision.reason == expectedReason && overlayPrecedesHit,
+                      detail: "native=\(nativeID), expected=\(expected) reason=\(expectedReason), actual=\(decision), ownedCG=\(windows), overlayPrecedesHit=\(overlayPrecedesHit)")
+        }
 
         let point = NSPoint(x: front.frame.midX, y: front.frame.midY)
         let uncovered = NSPoint(x: back.frame.minX + 10, y: back.frame.minY + 10)
@@ -92,11 +153,27 @@ struct WindowHitNativeTests {
         try expectHit("frontmost opaque window", at: point, expected: frontID)
         try expectHit("uncovered back window", at: uncovered, expected: backID)
         try expectHit("below excludes front window", at: point, expected: backID, below: frontID)
+        try expectSelected("selector captures native front window", at: point, window: frontID)
+        try expectSelected("selector captures native uncovered window", at: uncovered, window: backID)
+        try expectSelected("selector falls back for its own native window", at: point, window: nil,
+                           reason: .ownWindow, ownPID: getpid())
 
         front.ignoresMouseEvents = true
         try expectHit("mouse-ignoring overlay is excluded", at: point, expected: backID)
+        try expectSelected("selector skips mouse-ignoring ordinary overlay", at: point, window: backID, overlay: frontID)
         front.ignoresMouseEvents = false
         try expectHit("mouse acceptance restored", at: point, expected: frontID)
+        try expectSelected("selector captures restored interactive window", at: point, window: frontID)
+        front.level = .screenSaver
+        front.orderFrontRegardless()
+        try expectSelected("selector falls back for interactive high-layer window", at: point, window: nil,
+                           reason: .unsupportedLayer)
+        front.ignoresMouseEvents = true
+        try expectSelected("selector bypasses real mouse-ignoring high-layer overlay", at: point, window: backID,
+                           overlay: frontID)
+        front.ignoresMouseEvents = false
+        front.level = .floating
+        front.orderFrontRegardless()
         front.alphaValue = 0
         settle(app)
         // Global visual alpha does not reliably change an opaque window's input
@@ -141,11 +218,17 @@ struct WindowHitNativeTests {
         fresh.display()
         try expectHit("fresh nonopaque drawn region receives hit", at: solidPoint, expected: fresh.windowNumber)
         try expectHit("fresh nonopaque clear region falls through", at: clearPoint, expected: backID)
+        try expectSelected("selector captures fresh nonopaque drawn region", at: solidPoint, window: fresh.windowNumber)
+        try expectSelected("selector bypasses fresh nonopaque clear region", at: clearPoint, window: backID,
+                           overlay: fresh.windowNumber)
         freshView.drawLeftHalf = false
         freshView.needsDisplay = true
         fresh.display()
         try expectHit("redrawn nonopaque clear region falls through", at: solidPoint, expected: backID)
         try expectHit("redrawn nonopaque solid region receives hit", at: clearPoint, expected: fresh.windowNumber)
+        try expectSelected("selector bypasses redrawn nonopaque clear region", at: solidPoint, window: backID,
+                           overlay: fresh.windowNumber)
+        try expectSelected("selector captures redrawn nonopaque drawn region", at: clearPoint, window: fresh.windowNumber)
         fresh.close()
 
         front.close()

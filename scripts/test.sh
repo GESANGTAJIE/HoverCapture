@@ -11,11 +11,16 @@ xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
     "$ROOT/Tests/TahoeDockTests.swift" -o "$ROOT/build/tahoe-dock-tests"
 "$ROOT/build/tahoe-dock-tests"
 xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
+    "$ROOT/Sources/CaptureSelection.swift" "$ROOT/Sources/WindowHitTest.swift" \
+    "$ROOT/Tests/NativeTargetTests.swift" -o "$ROOT/build/native-target-tests"
+"$ROOT/build/native-target-tests"
+xcrun swiftc -swift-version 5 -module-cache-path "$ROOT/build/module-cache" \
     "$ROOT/Sources/CaptureSelection.swift" "$ROOT/Sources/CaptureDiagnostics.swift" \
     "$ROOT/Sources/WindowHitTest.swift" \
     "$ROOT/Tests/DiagnosticsTests.swift" -o "$ROOT/build/diagnostics-tests"
 "$ROOT/build/diagnostics-tests"
 xcrun swiftc -swift-version 5 -parse-as-library -module-cache-path "$ROOT/build/module-cache" -framework AppKit \
+    "$ROOT/Sources/CaptureSelection.swift" "$ROOT/Sources/WindowHitTest.swift" \
     "$ROOT/Tests/WindowHitNativeTests.swift" -o "$ROOT/build/window-hit-native-tests"
 HIT_PREFLIGHT=0
 "$ROOT/build/window-hit-native-tests" --preflight || HIT_PREFLIGHT=$?

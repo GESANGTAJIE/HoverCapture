@@ -8,15 +8,15 @@ Point at a Mac window. Press one shortcut. Get a screenshot of that window, save
 
 HoverCapture is a small native macOS menu bar app. It does not need Hammerspoon, a browser extension, or a background command-line service.
 
-## 0.2.2 RC4 — Tahoe Dock selection candidate
+## 0.2.2 RC5 — window selection through click-through overlays
 
-[Download RC4 (build 8)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.4). **Acceptance on the affected M1 / Tahoe 26.1 device is pending. Homebrew remains on 0.2.1.** RC3 worked in the reported Finder/Dock checks on macOS 15.7.2, but failed on Tahoe 26.1: its Dock transparency probe reported visible pixels over Finder and still selected the screen.
+[Download RC5 (build 9)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.5). **The affected M1 / Tahoe 26.1 device still needs to verify this candidate with WPS running. Homebrew remains on 0.2.1.** Its RC4 report correctly identified Finder as the native mouse target, but our selection logic let a WPS-owned full-display overlay override it and choose Screen. The user confirmed that quitting WPS restored Finder = Window and Dock = Screen on that same device.
 
-RC4 replaces the pixel probe with macOS's native mouse-target query. The target is determined synchronously when the shortcut is handled, before image capture begins; there is no need to hold the pointer still afterward. Only a full-display, layer-20 Dock surface ahead of a validated native target may be skipped. Actual Dock hits or unavailable evidence retain screen fallback; ordinary windows, menus and other overlays retain their selection rules. No additional Accessibility permission or temporary Dock image capture is needed. See [the implementation and testing record](docs/TESTING.md).
+RC5 uses the validated native mouse target directly instead of limiting overlay bypass to Dock. This handles the same class of click-through overlay without a WPS-specific exception. A click-through overlay can be visible while letting the underlying window receive mouse input. Actual targets that are Dock, desktop, HoverCapture itself, or an unsupported menu/overlay still produce a display capture. If the native result cannot be validated, selection uses the conservative window-list fallback. No additional permissions are needed. See [the implementation and testing record](docs/TESTING.md).
 
-To verify on the affected Mac: keep Dock visible. Finder's center should produce a `Window-` image containing only Finder; a visible Dock icon should produce `Screen-`. If either fails, select **Copy Last Capture Diagnosis** and share the complete text (`diagnosis v3`, `appVersion=0.2.2 build=8`, including the `nativeHit` line). The report includes application identifiers, coordinates and target-query results, but no screenshot pixels, window titles or document paths. It remains in memory, is never uploaded automatically, and copying it replaces clipboard content. Copy Batch restores retained screenshots.
+To verify on the affected Mac: keep WPS running and Dock visible. Finder's center should produce a `Window-` image containing only Finder; a visible Dock icon should produce `Screen-`. If either fails, select **Copy Last Capture Diagnosis** and share the complete text (`diagnosis v4`, `appVersion=0.2.2 build=9`, including `nativeHit`, `selectionSource` and `bypassedWindowIDs`). The report includes application identifiers, coordinates and target-query results, but no screenshot pixels, window titles or document paths. It remains in memory, is never uploaded automatically, and copying it replaces clipboard content. Copy Batch restores retained screenshots.
 
-Temporary workaround: enable System Settings → Desktop & Dock → Automatically hide and show the Dock, wait until it hides, then capture over an ordinary window. No permission reset is needed for this workaround.
+Confirmed temporary workaround for the reported RC4 case: quit WPS before capturing. This does not require a permission reset.
 
 ## 0.2.1 preview
 
@@ -48,7 +48,7 @@ Overlapping windows, dialogs and popups, Dock/menu fallback, first-install autho
 
 ## What it does
 
-- Captures the topmost supported app window under the pointer, without clicking or bringing it to the front.
+- Captures the supported app window identified as the mouse target, without clicking or bringing it to the front.
 - Captures the **display containing the pointer** when the pointer is over the desktop, Dock, or menu area.
 - Saves to a folder you choose; the default is `~/Downloads/WindowShots`.
 - Copies the same image to the clipboard, ready for **Command–V** in an app that accepts images.
@@ -141,15 +141,15 @@ In **Interface language**, choose **Follow System**, **简体中文**, or **Engl
 | Situation | Result or limitation |
 | --- | --- |
 | Ordinary app window | The window itself, without surrounding desktop, other windows, or its outer shadow. |
-| Overlapping windows | The frontmost supported window at the pointer is selected. Point at an exposed part of a lower window to select it. ScreenCaptureKit can capture its available window content without compositing an overlapping window over it. |
-| Completely covered window | Cannot be selected by hovering; expose some of it first. |
+| Overlapping windows | The validated native mouse target is selected. Usually this is the front window at the pointer; a click-through overlay can leave the lower window as the target. ScreenCaptureKit captures the target's available content without compositing the overlay over it. |
+| Completely covered window | Cannot be selected through a window that receives mouse input; expose some of it first. |
 | Floating panel or independent dialog | May be captured separately if macOS exposes it as a supported window. |
 | Attached child window or sheet | The parent capture does not intentionally include separate child windows. A child can only be captured separately if it is exposed as a supported candidate. |
 | Popup drawn inside a webpage or app's own window | It is part of that window's pixels and appears in the screenshot. |
-| Desktop, Dock, menus, and unsupported system overlays | Falls back to the display under the pointer. This includes everything currently visible on that display. |
+| Desktop, Dock, menus, and unsupported system overlays | When identified as the mouse target, falls back to the display under the pointer. This includes everything currently visible on that display. |
 | HoverCapture's own settings window | Falls back to the display under the pointer. Move the pointer to another app to capture that app's window. |
 | Multiple displays | Fallback captures one display, not a stitched image of all displays. A window capture targets the selected window. |
-| Transparent windows and rounded corners | May produce transparent pixels. Hit testing uses rectangular window bounds, not the transparency of each pixel. |
+| Transparent windows and rounded corners | May produce transparent pixels. Selection follows the validated native mouse target, not a pixel-opacity guess. If the query cannot be validated, rectangular window bounds are used as a fallback and may include transparent areas. |
 | Minimized, hidden, or other-Space windows | Not available for selection by hover. Switch to the relevant Space or restore the window first. |
 | Full-screen app | Can be a target if macOS exposes it in the current Space. System overlays and secure surfaces may affect selection or capture. |
 | DRM video, password/security UI, and protected content | May be blank, unavailable, or fail to capture. HoverCapture does not bypass macOS or app protections. |

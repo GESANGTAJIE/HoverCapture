@@ -31,16 +31,21 @@ enum CaptureSelectionReason: String {
     case window, desktopElement, ownWindow, unsupportedLayer, noWindow
 }
 
+enum CaptureSelectionSource: String {
+    case nativeHit, windowList
+}
+
 struct CaptureDecision: Equatable {
     let target: CaptureTarget
     let reason: CaptureSelectionReason
     let windowIndex: Int?
-    let skippedDockWindowIDs: [CGWindowID]
+    let bypassedWindowIDs: [CGWindowID]
+    let source: CaptureSelectionSource
 }
 
 enum CaptureSelection {
-    // WindowServer supplies these windows from front to back. Stop at the first
-    // visible surface: a menu must not expose a window behind it as the target.
+    // The validated native mouse target is authoritative. Rectangle order is a
+    // conservative fallback when the native result cannot be matched safely.
     static func target(at point: CGPoint, windows: [CaptureWindow],
                        displays: [CaptureDisplay], ownPID: Int32,
                        nativeWindowNumber: Int? = nil) throws -> CaptureTarget {
@@ -54,43 +59,43 @@ enum CaptureSelection {
         guard point.x.isFinite, point.y.isFinite else {
             throw CaptureSelectionError.invalidPointer
         }
-        var skippedDockWindowIDs: [CGWindowID] = []
-        let nativeIndex = WindowHitTest.matchedIndex(for: nativeWindowNumber, at: point, windows: windows)
+        if let index = WindowHitTest.matchedIndex(for: nativeWindowNumber, at: point, windows: windows) {
+            let bypassed = windows[..<index].filter {
+                $0.layer >= 0 && $0.alpha.isFinite && $0.alpha > 0 && valid($0.bounds) && contains($0.bounds, point)
+            }.map(\.id)
+            return try classify(windows[index], at: point, index: index, displays: displays, ownPID: ownPID,
+                                bypassed: bypassed, source: .nativeHit)
+        }
         for (index, window) in windows.enumerated() {
             guard window.alpha.isFinite, valid(window.bounds) else {
                 throw CaptureSelectionError.invalidWindow
             }
             guard window.layer >= 0, window.alpha > 0,
                   contains(window.bounds, point) else { continue }
-            // Dock's full-display surface is not its mouse-hit region. Only the
-            // system's validated hit on a later surface permits bypassing it.
-            // Keep scanning in order so other visible blockers still take effect.
-            if isFullDisplayDock(window, displays: displays),
-               let nativeIndex, index < nativeIndex {
-                skippedDockWindowIDs.append(window.id)
-                continue
-            }
-            if window.isDesktopElement || window.ownerPID == ownPID ||
-                ![0, 3, 8].contains(window.layer) {
-                let reason: CaptureSelectionReason = window.isDesktopElement ? .desktopElement
-                    : (window.ownerPID == ownPID ? .ownWindow : .unsupportedLayer)
-                return CaptureDecision(target: try screen(at: point, displays: displays), reason: reason,
-                                       windowIndex: index, skippedDockWindowIDs: skippedDockWindowIDs)
-            }
-            guard window.id != 0, window.ownerPID > 0 else {
-                throw CaptureSelectionError.invalidWindow
-            }
-            return CaptureDecision(target: .window(id: window.id, ownerPID: window.ownerPID), reason: .window,
-                                   windowIndex: index, skippedDockWindowIDs: skippedDockWindowIDs)
+            return try classify(window, at: point, index: index, displays: displays, ownPID: ownPID,
+                                bypassed: [], source: .windowList)
         }
         return CaptureDecision(target: try screen(at: point, displays: displays), reason: .noWindow,
-                               windowIndex: nil, skippedDockWindowIDs: skippedDockWindowIDs)
+                               windowIndex: nil, bypassedWindowIDs: [], source: .windowList)
     }
 
-    static func isFullDisplayDock(_ window: CaptureWindow, displays: [CaptureDisplay]) -> Bool {
-        window.id != 0 && window.ownerPID > 0 && window.isDesktopElement && window.layer == 20 &&
-            displays.contains { $0.id != 0 && valid($0.bounds) && $0.bounds.width > 0 &&
-                $0.bounds.height > 0 && $0.bounds == window.bounds }
+    private static func classify(_ window: CaptureWindow, at point: CGPoint, index: Int,
+                                 displays: [CaptureDisplay], ownPID: Int32,
+                                 bypassed: [CGWindowID], source: CaptureSelectionSource) throws -> CaptureDecision {
+        let reason: CaptureSelectionReason
+        if window.isDesktopElement || window.layer < 0 {
+            reason = .desktopElement
+        } else if window.ownerPID == ownPID {
+            reason = .ownWindow
+        } else if ![0, 3, 8].contains(window.layer) {
+            reason = .unsupportedLayer
+        } else {
+            guard window.id != 0, window.ownerPID > 0 else { throw CaptureSelectionError.invalidWindow }
+            return CaptureDecision(target: .window(id: window.id, ownerPID: window.ownerPID), reason: .window,
+                                   windowIndex: index, bypassedWindowIDs: bypassed, source: source)
+        }
+        return CaptureDecision(target: try screen(at: point, displays: displays), reason: reason,
+                               windowIndex: index, bypassedWindowIDs: bypassed, source: source)
     }
 
     private static func screen(at point: CGPoint, displays: [CaptureDisplay]) throws -> CaptureTarget {

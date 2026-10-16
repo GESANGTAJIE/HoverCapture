@@ -13,14 +13,15 @@ enum CaptureDiagnostics {
         case let .screen(id): target = "screen id=\(id)"
         }
         var lines = [
-            "HoverCapture target diagnosis v3",
+            "HoverCapture target diagnosis v4",
             "appVersion=\(appVersion) build=\(buildVersion)",
             "system=\(systemVersion)",
             "capturedAt=\(ISO8601DateFormatter().string(from: date)) ownPID=\(ownPID)",
             "pointer=(\(point.x),\(point.y))",
             "target=\(target) reason=\(decision.reason.rawValue)",
             "decisiveWindowIndex=\(decision.windowIndex.map(String.init) ?? "none")",
-            "skippedDockWindowIDs=\(decision.skippedDockWindowIDs.map(String.init).joined(separator: ","))",
+            "selectionSource=\(decision.source.rawValue)",
+            "bypassedWindowIDs=\(decision.bypassedWindowIDs.map(String.init).joined(separator: ","))",
             "displayCount=\(displays.count) windowCount=\(windows.count)"
         ]
         for display in displays {

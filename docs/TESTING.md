@@ -4,7 +4,27 @@ The status section records checks confirmed for the current preview. The remaini
 
 状态部分记录当前预览版已确认的检查，其余部分说明测试方法；**出现在清单中不代表已经通过**。后续完成检查时请更新状态，并明确失败与未执行项。
 
-## 0.2.2 RC4: native mouse target / RC4：系统鼠标目标查询
+## 0.2.2 RC5: use the validated native target / RC5：使用已验证的系统目标
+
+On 2026-10-16, the affected **M1 / macOS Tahoe 26.1 (25B78)** device reported that RC4 still captured Screen while WPS was running. Its native query already returned Finder **13596**, matched at list index **22**, for pointer `(817.578125,175.34765625)`. The selection nevertheless stopped at index **0**: WPS window **12989**, layer **2147483630**, covering `(0,0,1440,900)`, and returned `unsupportedLayer`. The native API worked on the affected device; our Dock-only exception incorrectly let another overlay override its result. The user then confirmed that **quitting WPS restored Finder = Window and Dock = Screen on the same Tahoe 26.1 Mac**. This confirms RC4's Dock behavior in that condition, not the WPS-running scenario.
+
+RC5 (build 9) classifies the validated native target directly. A supported application window (layer 0, 3 or 8) produces a window capture; an actual Dock, desktop, own-app or unsupported-layer target produces a display capture. A missing or invalid native result retains the conservative window-list scan. There is no WPS whitelist or software-specific bypass: the rule handles any overlay through which macOS directs mouse input to a validated underlying target. Such an overlay can be visible; ignoring mouse input does not mean its pixels are transparent. No new permissions are requested.
+
+The two regression fixtures replaying the supplied relevant-window trace and its minimal blocker/target pair failed under RC4 and pass with this change. Unlike the earlier synthetic Dock assumptions, the Finder native ID here was observed in the affected device's own report. Local verification: **230 checks passed, 0 failed** (49 selection, 86 Tahoe/coordinate validation, 2 reported-target regressions, 37 diagnostics, 18 language, 25 batch, 11 login, 2 packaging). Universal `arm64` / `x86_64` compilation and strict ad-hoc signature verification passed. The restricted local session explicitly skipped the **31 native window-hit integration checks** and **10 native pasteboard checks**. CI requires native window-hit checks on macOS 15 and 26, including the actual native API → CG window metadata → production selector chain; CI and installation-package results are recorded in the release notes after completion.
+
+Diagnostic version 4 records `selectionSource=nativeHit` or `windowList` and `bypassedWindowIDs`, alongside the native result and actual decisive window. These fields distinguish a validated native selection from fallback without storing screenshots, titles or document paths.
+
+**Affected-device acceptance with WPS running remains pending.** Install [RC5 (build 9)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.5), keep WPS running and Dock visible, then check Finder center = target-only `Window-` and visible Dock icon = `Screen-`. Also check ordinary WPS windows, empty desktop and menus. For a failure, copy the complete diagnosis v4 and confirm `appVersion=0.2.2 build=9`. Homebrew remains **0.2.1** until acceptance. Quitting WPS is the confirmed temporary workaround for the reported RC4 case.
+
+2026-10-16，受影响的 **M1／Tahoe 26.1（25B78）** 报告 RC4 在 WPS 运行时仍截全屏。系统查询已经返回 Finder **13596**，在窗口列表中匹配索引 **22**；选择器却被索引 **0**、层级 **2147483630** 的 WPS 全屏覆盖窗口 **12989** 阻挡，返回 `unsupportedLayer`。系统接口在这台设备上已取得正确目标，错误在于我们只允许 Dock 跳过规则使用这个结果。用户随后确认：**同一台 Tahoe 26.1 退出 WPS 后，Finder 为 Window、Dock 为 Screen**。这验证了该条件下的 Dock 行为，不能当作 WPS 运行时通过。
+
+RC5（构建 9）直接对已验证的系统目标分类：受支持应用窗口截窗口，实际命中 Dock、桌面、应用自己或不支持层级时截显示器；系统结果无效则保留窗口列表的保守回退。没有 WPS 白名单，也没有按软件名称跳过的例外，适用于系统把鼠标输入交给下层窗口的同类覆盖层。允许鼠标穿透不代表画面一定透明。无需新权限。
+
+根据用户真实窗口列表及精简阻挡／目标组合编写的两项回归，均在 RC4 下失败、修改后通过；其中 Finder 原生命中编号来自该设备真实日志。本地 **230 项通过、0 失败**，双架构构建与严格 ad-hoc 签名验证通过；受限本机环境明确跳过 **31 项原生窗口集成**和 **10 项原生剪贴板检查**。CI 要求 macOS 15 与 26 执行原生窗口检查，覆盖“实际系统查询 → CG 窗口元数据 → 生产选择器”完整链路，CI 与安装包结果完成后记录到发布说明。
+
+诊断 v4 增加选择来源 `selectionSource` 与跳过的窗口编号 `bypassedWindowIDs`，不保存图片、标题或文档路径。**仍需在受影响设备保持 WPS 运行、Dock 显示时验收 RC5，Homebrew 保持 0.2.1**。Finder 中央应为仅含窗口的 `Window-`，Dock 图标应为 `Screen-`，并补测普通 WPS 窗口、桌面和菜单。异常时提供构建 9 的完整 v4 诊断。RC4 当前已验证的临时办法是退出 WPS。
+
+## 0.2.2 RC4: superseded after overlay selection failure / RC4：覆盖窗口选择失败，已被替代
 
 RC3 failed acceptance on the affected **M1 / macOS Tahoe 26.1 (25B78)** Mac. Its build-7 report at `(783.45703125,91.2890625)` showed full-display Dock window 16 ahead of Finder window 6604, with `dockProbe id=16 alpha=visible detail=sampled`; the selected target was Screen. Replaying this metadata and visible probe result reproduced the failure. The separate Finder = Window / Dock = Screen confirmation came from **macOS 15.7.2**, not the affected Tahoe device.
 
@@ -18,13 +38,13 @@ Local verification: **206 checks passed, 0 failed** (46 selection, 70 Tahoe/coor
 
 Native fixture investigation on 2026-10-16: the first macOS 15 CI attempt failed a global-alpha-zero expectation; aggregating results revealed an additional failure after changing an already displayed opaque window to nonopaque. After adding an AppKit event pump, own-view alpha checks and a fresh nonopaque fixture, Tahoe CI reported **18 passed, 2 failed**: the same two mutations still returned the front window. The fresh nonopaque window's solid and clear regions both behaved correctly. These are observed API/fixture limits, not proof of a stale WindowServer input mask. Global alpha and changing the opacity mode are now explicitly logged observations, excluded from passing-test counts. Fresh transparent-region assertions remain mandatory; the suite also requires correct hit changes when an already nonopaque window redraws its solid/clear regions. The app does not mutate other windows. A native query that still returns Dock keeps Screen fallback, so real Dock acceptance remains necessary.
 
-**Affected-device acceptance is pending.** Install [RC4 (build 8)](https://github.com/GESANGTAJIE/HoverCapture/releases/tag/v0.2.2-rc.4) and keep Dock visible. Finder center must produce a target-only `Window-` image, and a visible Dock icon must produce `Screen-`; also repeat over empty desktop and a menu. Holding the pointer still after the shortcut is no longer required. On failure, copy the complete diagnosis and confirm version 3, `appVersion=0.2.2 build=8` and the `nativeHit` line. Homebrew remains at **0.2.1** until affected-device acceptance.
+The final RC4 CI run passed **256 checks** across macOS 15.7.9 and Tahoe 26.6.2 (206 local-compatible checks, 20 native window-hit checks on each system, and 10 pasteboard checks). Release package integrity also passed. **Affected-device acceptance later failed with WPS running**, despite a correct native Finder result, as detailed in the RC5 section above. After quitting WPS on that same Tahoe 26.1 device, the user confirmed Finder = Window and Dock = Screen. RC4 is superseded; the CI results remain evidence for those tested cases, not proof that the affected-device scenario passed. Homebrew was not promoted.
 
 RC3 在受影响的 **M1／Tahoe 26.1（25B78）** 上未通过验收：鼠标位于 Finder 时，构建 7 的日志显示 `dockProbe id=16 alpha=visible detail=sampled`，最终仍选择全屏；回放该元数据与检测结果可复现失败。此前“Finder 为 Window、Dock 为 Screen”的结果仅来自 **macOS 15.7.2**，不能作为 Tahoe 验收结果。
 
 RC4（构建 8）移除异步 Dock 像素检测，改用上述公开系统接口查询实际鼠标目标，查询参数始终为 `belowWindowWithWindowNumber: 0`。坐标按主显示器在 Quartz 与 AppKit 之间转换，不按 Retina 倍率缩放；在首次异步截图之前同步冻结查询、窗口列表和选择结果，按快捷键后无需保持鼠标不动。返回值必须在同一列表中唯一匹配有效窗口且包含鼠标位置；只有排在该匹配之前、全屏且层级 20 的 Dock 窗口允许跳过，其他阻挡规则保留。命中 Dock 或证据无效时仍回退全屏，不额外申请辅助功能权限，也不再生成用于检测的 Dock 图片。
 
-诊断 v3 增加 `nativeHit` 行，包含窗口编号、匹配索引与转换后的坐标；仍不含图片、标题或路径，不自动上传。本地 **206 项通过、0 失败**，双架构构建及严格 ad-hoc 签名校验通过，无编译警告；受限环境明确跳过原生窗口与剪贴板集成。发布 CI 要求 macOS 26 与 15 各执行 **20 项原生窗口检查**，macOS 15 另执行 **10 项原生剪贴板检查**，结果与安装包检查记入发布说明。**受影响设备仍待验收，Homebrew 保持 0.2.1**；复测需确认 Finder 中央为仅含窗口的 `Window-`、Dock 图标为 `Screen-`，异常时提供构建 8 的完整 v3 诊断。
+诊断 v3 增加 `nativeHit` 行，包含窗口编号、匹配索引与转换后的坐标；仍不含图片、标题或路径，不自动上传。本地 **206 项通过、0 失败**，双架构构建及严格 ad-hoc 签名校验通过，无编译警告；受限环境明确跳过原生窗口与剪贴板集成。RC4 最终 CI 在 macOS 15.7.9 与 Tahoe 26.6.2 共 **256 项通过**，安装包完整性检查通过。**后续受影响设备在 WPS 运行时验收失败**；退出 WPS 后，同一台 Tahoe 26.1 的 Finder／Dock 行为通过。RC4 已被替代，上述自动检查不证明 WPS 场景通过，Homebrew 未升级。
 
 2026-10-16 的原生测试调查：初次 CI 在全局透明度设为零时失败，汇总检查又发现已有不透明窗口改为非不透明后，透明区域仍返回前面的窗口。补齐 AppKit 事件处理、验证视图绘制的透明通道并加入新建透明窗口后，Tahoe CI 为 **18 通过、2 失败**：两项变化仍返回前窗口，但新建非不透明窗口的实色／透明区域判断均正确。目前将这两项记录为独立观察，不计入通过数，不将原因断言为“旧命中区域缓存”。新建透明区域判断仍须通过，另要求非不透明窗口重绘实色／透明区域后正确更新命中。应用不会修改其他窗口；若系统查询仍返回 Dock，会保留全屏，因此实际 Dock 场景仍需验收。
 
@@ -215,13 +235,13 @@ Run from the repository root on a Mac with Apple's command-line build tools:
 ./scripts/package.sh
 ```
 
-- The test script exercises selection, coordinate conversion, diagnostics, language, batching, login settings and packaging. Native integration checks exercise the window-hit API with test-owned windows and the pasteboard. No test grants Screen Recording permission or validates real screenshot pixels.
+- The test script exercises selection, coordinate conversion, diagnostics, language, batching, login settings and packaging. Native integration checks use test-owned windows to exercise the window-hit API, CG metadata and production selector together, plus the pasteboard. No test grants Screen Recording permission or validates real screenshot pixels.
 - In restricted environments, unavailable native GUI/pasteboard checks are explicitly skipped. Release CI runs `./scripts/test.sh --require-window-hit --require-pasteboard` so those checks are mandatory; a functional test failure is not a skip.
 - The build script compiles and assembles a universal app for the minimum supported macOS version.
 - The packaging script creates the DMG and ZIP for installation testing.
 - Review command exit codes and complete output. Report a failed compilation or packaging step rather than continuing as if it succeeded.
 
-自动测试验证选择、坐标转换、诊断、语言、批次、登录设置与打包；原生集成检查使用测试工具自建窗口验证命中接口，并验证剪贴板。测试不申请录屏权限，也不能确认真实截图是否正确。受限环境中不可用的原生检查会明确跳过；发布 CI 使用 `--require-window-hit --require-pasteboard` 要求两组执行，功能测试失败不能记为跳过。构建验证编译与应用打包，安装包脚本验证 DMG/ZIP 生成。检查每一步退出状态和完整错误，不要忽略失败。
+自动测试验证选择、坐标转换、诊断、语言、批次、登录设置与打包；原生集成检查使用测试工具自建窗口，联通实际命中接口、CG 元数据和生产选择器，并验证剪贴板。测试不申请录屏权限，也不能确认真实截图是否正确。受限环境中不可用的原生检查会明确跳过；发布 CI 使用 `--require-window-hit --require-pasteboard` 要求两组执行，功能测试失败不能记为跳过。构建验证编译与应用打包，安装包脚本验证 DMG/ZIP 生成。检查每一步退出状态和完整错误，不要忽略失败。
 
 If the environment cannot create disk images, run `./scripts/package.sh --zip-only` to generate the universal ZIP and its checksum file. Record that no DMG was produced, skip the DMG verification command below, and verify the ZIP instead. This packaging mode does not change the app's signing or permission requirements.
 
@@ -266,7 +286,7 @@ Test with harmless sample windows. Do not publish screenshots of private content
 | Mixed display scaling / 混合缩放 | Verify sharpness, dimensions, and lack of cropping on Retina and non-Retina configurations. / 检查清晰度、尺寸及是否裁切错误。 |
 | Window across displays / 窗口跨屏 | Correct window selected; inspect actual bounds and scale, noting system limitations. / 目标正确，检查实际范围、比例及系统限制。 |
 | Current Space and full screen / 桌面空间与全屏 | Only currently hoverable windows are eligible; record full-screen behavior. / 仅选择当前可悬停窗口，记录全屏行为。 |
-| Transparent window / 透明窗口 | Rectangular hit testing matches documented limitation; inspect alpha in saved PNG. / 符合矩形命中限制，检查 PNG 透明通道。 |
+| Transparent or click-through overlay / 透明或可穿透覆盖窗口 | A validated underlying mouse target remains the capture target; an actual unsupported overlay hit produces Screen. Check native/fallback source in the diagnosis and inspect saved PNG alpha. / 已验证的下层鼠标目标应保持为截图目标；实际命中不支持浮层时截全屏。检查诊断中的原生／回退来源及 PNG 透明通道。 |
 | Clipboard / 剪贴板 | Paste in an image-capable app and compare with the saved PNG. / 在支持图片的应用中粘贴，与文件一致。 |
 | Default folder / 默认目录 | PNG appears in Downloads/WindowShots; absent directory is handled visibly. / 文件出现在默认目录，缺失目录有明确处理。 |
 | Custom folder / 自选目录 | Test Documents, spaces, Chinese characters, and an external volume; choice survives restart. / 测试文稿、空格、中文、外接盘路径，重启后保留。 |

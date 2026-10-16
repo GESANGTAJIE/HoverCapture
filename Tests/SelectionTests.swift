@@ -56,8 +56,8 @@ struct SelectionTests {
         try expect("window on left display", [window(11, x: -600)], .window(id: 11, ownerPID: 42), at: CGPoint(x: -500, y: 150))
         try expect("window on upper display", [window(11, y: -500)], .window(id: 11, ownerPID: 42), at: CGPoint(x: 150, y: -300))
 
-        // A matching native mouse target behind a full-display Dock permits a
-        // skip. Metadata alone does not establish where mouse events would go.
+        // A validated native mouse target determines which surface receives input.
+        // Window rectangles alone cannot identify mouse-ignoring overlays.
         let dockTracking = CaptureWindow(id: 20, ownerPID: 55, bounds: main.bounds,
                                          layer: 20, alpha: 1, isDesktopElement: true,
                                          sharingState: 0, hasTitle: false)
@@ -78,7 +78,11 @@ struct SelectionTests {
 
         var otherOwner = dockTracking
         otherOwner.isDesktopElement = false
-        try expect("unknown full-display overlay still blocks", [otherOwner, window(11)], .screen(id: 1), native: 11)
+        try expect("native app hit bypasses another owner's overlay", [otherOwner, window(11)],
+                   .window(id: 11, ownerPID: 42), native: 11)
+        try expect("native unsupported overlay hit still captures screen", [otherOwner, window(11)],
+                   .screen(id: 1), native: 20)
+        try expect("unknown overlay blocks when native hit is missing", [otherOwner, window(11)], .screen(id: 1))
         var namedDock = dockTracking
         namedDock.hasTitle = true
         try expect("named Dock overlay still blocks", [namedDock, window(11)], .screen(id: 1))
@@ -92,23 +96,25 @@ struct SelectionTests {
                                       bounds: CGRect(x: 100, y: 800, width: 1000, height: 100),
                                       layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
         try expect("visible Dock strip still blocks", [dockTracking, dockStrip, window(11, y: 600)],
-                   .screen(id: 1), at: CGPoint(x: 150, y: 850), native: 11)
+                   .screen(id: 1), at: CGPoint(x: 150, y: 850), native: 23)
         let dockMenu = CaptureWindow(id: 24, ownerPID: 55,
                                      bounds: CGRect(x: 100, y: 100, width: 500, height: 400),
                                      layer: 101, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("Dock menu still blocks", [dockMenu, dockTracking, window(11)], .screen(id: 1), native: 11)
+        try expect("native Dock menu still blocks", [dockMenu, dockTracking, window(11)], .screen(id: 1), native: 24)
         let otherDockLayer = CaptureWindow(id: 25, ownerPID: 55, bounds: main.bounds,
                                            layer: 101, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("full-display Dock at another layer still blocks", [otherDockLayer, window(11)], .screen(id: 1), native: 11)
+        try expect("native full-display Dock at another layer still blocks", [otherDockLayer, window(11)], .screen(id: 1), native: 25)
         let missionControl = CaptureWindow(id: 27, ownerPID: 55, bounds: main.bounds,
                                            layer: 18, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("Mission Control layer still blocks", [missionControl, window(11)], .screen(id: 1), native: 11)
+        try expect("native Mission Control layer still blocks", [missionControl, window(11)], .screen(id: 1), native: 27)
         let partialDock = CaptureWindow(id: 26, ownerPID: 55,
                                         bounds: CGRect(x: 0, y: 0, width: 1440, height: 899),
                                         layer: 20, alpha: 1, isDesktopElement: true, sharingState: 0)
-        try expect("near-full-display Dock still blocks", [partialDock, window(11)], .screen(id: 1), native: 11)
+        try expect("native near-full-display Dock still blocks", [partialDock, window(11)], .screen(id: 1), native: 26)
         try expect("ordinary popup above tracking surface stays selected",
-                   [window(12, layer: 8), dockTracking, window(11)], .window(id: 12, ownerPID: 42), native: 11)
+                   [window(12, layer: 8), dockTracking, window(11)], .window(id: 12, ownerPID: 42), native: 12)
+        try expect("native app hit bypasses a mouse-ignoring ordinary popup",
+                   [window(12, layer: 8), dockTracking, window(11)], .window(id: 11, ownerPID: 42), native: 11)
         let fullApp = CaptureWindow(id: 28, ownerPID: 42, bounds: main.bounds,
                                     layer: 0, alpha: 1, sharingState: 0)
         try expect("sharing-none ordinary fullscreen window remains eligible",

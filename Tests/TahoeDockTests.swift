@@ -43,12 +43,15 @@ struct TahoeDockTests {
         ] {
             let result = try decide(windows)
             try check("\(name) with native Finder hit", result.target == .window(id: 6604, ownerPID: 628))
-            try check("\(name) records skip and original index", result.skippedDockWindowIDs == [16] && result.windowIndex == 1)
+            try check("\(name) records native source, bypass and original index",
+                      result.source == .nativeHit && result.bypassedWindowIDs == [16] && result.windowIndex == 1)
         }
         for hit: Int? in [nil, 0, -1, Int.max, Int(UInt32.max) + 1, 9999, 16] {
             let result = try decide([dock, finder], hit: hit)
             try check("unusable or Dock hit \(String(describing: hit)) keeps screen fallback",
-                      result.target == .screen(id: 1) && result.reason == .desktopElement && result.skippedDockWindowIDs.isEmpty)
+                      result.target == .screen(id: 1) && result.reason == .desktopElement && result.bypassedWindowIDs.isEmpty)
+            try check("unusable or Dock hit \(String(describing: hit)) records selection source",
+                      result.source == (hit == 16 ? .nativeHit : .windowList))
         }
         for state: Int? in [nil, 0, 1, 2] {
             for title in [false, true] {
@@ -61,7 +64,7 @@ struct TahoeDockTests {
         }
         let duplicateResult = try decide([dock, finder, finder])
         try check("ambiguous native ID does not authorize skip", duplicateResult.target == .screen(id: 1) &&
-                  duplicateResult.skippedDockWindowIDs.isEmpty)
+                  duplicateResult.bypassedWindowIDs.isEmpty && duplicateResult.source == .windowList)
 
         for (name, bounds, alpha, pid) in [
             ("moved away", CGRect(x: 0, y: 500, width: 500, height: 300), 1.0, Int32(628)),
@@ -86,18 +89,25 @@ struct TahoeDockTests {
             for: 6604, at: CGPoint(x: finder.bounds.maxX, y: point.y), windows: [finder]) == nil)
 
         let menu = CaptureWindow(id: 100, ownerPID: 628, bounds: finder.bounds, layer: 101, alpha: 1)
-        let before = try decide([menu, dock, finder])
-        try check("menu ahead of Dock blocks before skip", before.target == .screen(id: 1) && before.skippedDockWindowIDs.isEmpty)
-        let behind = try decide([dock, menu, finder])
-        try check("menu behind Dock is still a blocker", behind.target == .screen(id: 1) &&
-                  behind.reason == .unsupportedLayer && behind.windowIndex == 1 && behind.skippedDockWindowIDs == [16])
+        let before = try decide([menu, dock, finder], hit: 100)
+        try check("native menu ahead of Dock captures screen", before.target == .screen(id: 1) &&
+                  before.bypassedWindowIDs.isEmpty && before.source == .nativeHit)
+        let behind = try decide([dock, menu, finder], hit: 100)
+        try check("native menu behind Dock is still a blocker", behind.target == .screen(id: 1) &&
+                  behind.reason == .unsupportedLayer && behind.windowIndex == 1 && behind.bypassedWindowIDs == [16])
+        let ignoredMenu = try decide([dock, menu, finder])
+        try check("native Finder hit bypasses a mouse-ignoring menu-layer surface",
+                  ignoredMenu.target == .window(id: 6604, ownerPID: 628) && ignoredMenu.bypassedWindowIDs == [16, 100])
+        let fallbackMenu = try decide([menu, dock, finder], hit: nil)
+        try check("missing native hit preserves conservative menu blocking", fallbackMenu.target == .screen(id: 1) &&
+                  fallbackMenu.reason == .unsupportedLayer && fallbackMenu.source == .windowList)
         let popup = CaptureWindow(id: 101, ownerPID: 628, bounds: finder.bounds, layer: 8, alpha: 1)
         let nativeAbove = try decide([popup, dock, finder], hit: 101)
         try check("native hit ahead of Dock keeps front popup", nativeAbove.target == .window(id: 101, ownerPID: 628) &&
-                  nativeAbove.skippedDockWindowIDs.isEmpty)
+                  nativeAbove.bypassedWindowIDs.isEmpty)
         let ignoredAbove = try decide([desktop, dock, finder], hit: 27)
-        try check("native match before Dock never authorizes later skip", ignoredAbove.target == .screen(id: 1) &&
-                  ignoredAbove.skippedDockWindowIDs.isEmpty)
+        try check("native desktop match captures screen without bypassing later surfaces", ignoredAbove.target == .screen(id: 1) &&
+                  ignoredAbove.reason == .desktopElement && ignoredAbove.windowIndex == 0 && ignoredAbove.bypassedWindowIDs.isEmpty)
         let own = CaptureWindow(id: 102, ownerPID: 8738, bounds: finder.bounds, layer: 0, alpha: 1)
         try check("own window behind Dock still captures screen", try decide([dock, own, finder], hit: 102).reason == .ownWindow)
         for (name, blocker) in [
@@ -105,17 +115,24 @@ struct TahoeDockTests {
             ("Mission Control", CaptureWindow(id: 104, ownerPID: 625, bounds: display.bounds, layer: 18, alpha: 1, isDesktopElement: true)),
             ("partial Dock", CaptureWindow(id: 105, ownerPID: 625, bounds: finder.bounds, layer: 20, alpha: 1, isDesktopElement: true))
         ] {
-            let result = try decide([blocker, finder])
-            try check("\(name) remains blocked", result.target == .screen(id: 1) && result.skippedDockWindowIDs.isEmpty)
+            let result = try decide([blocker, finder], hit: Int(blocker.id))
+            try check("native \(name) hit remains blocked", result.target == .screen(id: 1) && result.bypassedWindowIDs.isEmpty)
+            let bypass = try decide([blocker, finder])
+            try check("native Finder hit bypasses mouse-ignoring \(name) surface",
+                      bypass.target == .window(id: 6604, ownerPID: 628) && bypass.bypassedWindowIDs == [blocker.id])
+            let fallback = try decide([blocker, finder], hit: nil)
+            try check("\(name) blocks without native hit", fallback.target == .screen(id: 1) && fallback.source == .windowList)
         }
         let secondDock = CaptureWindow(id: 106, ownerPID: 625, bounds: display.bounds, layer: 20, alpha: 1, isDesktopElement: true)
         let twoDock = try decide([dock, secondDock, finder])
         try check("two full-display Dock surfaces before native target are skipped in order",
-                  twoDock.skippedDockWindowIDs == [16, 106] && twoDock.target == .window(id: 6604, ownerPID: 628))
+                  twoDock.bypassedWindowIDs == [16, 106] && twoDock.target == .window(id: 6604, ownerPID: 628))
         let dockHit = try decide([dock, secondDock, finder], hit: 106)
         try check("native Dock hit stops at that Dock surface", dockHit.target == .screen(id: 1) &&
-                  dockHit.windowIndex == 1 && dockHit.skippedDockWindowIDs == [16])
-        try check("ordinary windows retain front-to-back ordering", try decide([finder, notes], hit: 6602).target ==
+                  dockHit.windowIndex == 1 && dockHit.bypassedWindowIDs == [16])
+        try check("native ordinary window behind a mouse-ignoring window wins", try decide([finder, notes], hit: 6602).target ==
+                  .window(id: 6602, ownerPID: 8750))
+        try check("ordinary windows retain front-to-back ordering without native hit", try decide([finder, notes], hit: nil).target ==
                   .window(id: 6604, ownerPID: 628))
         try check("native desktop hit over empty desktop keeps screen", try decide([dock, desktop], hit: 27).target == .screen(id: 1))
 
